@@ -1,0 +1,35 @@
+# OMC session state (giữ .omc/research/ trong git)
+.omc/state/
+.omc/logs/
+.omc/sessions/
+.omc/project-memory.json
+
+# Scratch của quy trình subagent-driven (brief/report/diff/ledger)
+.superpowers/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Node
+node_modules/
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# DỮ LIỆU LÀ PRIVATE — không đưa lên GitHub (lợi thế cạnh tranh của team).
+# Toàn bộ data/ chỉ phân phối qua zip nội bộ (scripts/make_release_zip.sh).
+data/*
+*.db
+
+#Codex
+.codex/
+
+#pytest_cache
+pytest_cache/
+
+#Readme-Data
+data/README.md

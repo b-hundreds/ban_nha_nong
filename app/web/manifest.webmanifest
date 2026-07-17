@@ -1,0 +1,15 @@
+{
+  "name": "Bạn Nhà Nông — trợ lý nông nghiệp",
+  "short_name": "Bạn Nhà Nông",
+  "description": "Hỏi đáp sâu bệnh, thuốc bảo vệ thực vật theo danh mục chính thống; có cán bộ khuyến nông hỗ trợ khi cần.",
+  "lang": "vi",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

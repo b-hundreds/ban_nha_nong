@@ -1,0 +1,23 @@
+pdfplumber==0.11.*
+httpx==0.28.*
+beautifulsoup4==4.12.*
+rapidfuzz==3.*
+pyvi==0.1.*
+pytest==8.*
+
+# App skeleton (backend + PWA) — xem .superpowers/sdd/app-skeleton-brief.md
+fastapi==0.139.*
+uvicorn[standard]==0.51.*
+python-multipart==0.0.*
+python-dotenv==1.2.*
+
+# ASR chính: Google Cloud Speech-to-Text v2 (Chirp 3) — xem app/backend/asr.py
+google-cloud-speech==2.40.*
+
+# P1-C: RAG đường B — Gemini embeddings (gemini-embedding-001) + generation
+# (gemini-flash-lite-latest mặc định, free tier — xem app/backend/generate.py;
+# gemini-2.5-flash-lite y/c ban đầu trả 404 "no longer available to new users"
+# với key thật đang dùng).
+# google-genai>=2.x đòi httpx>=0.28.1 -> đã bump pin httpx bên trên theo (kiểm tra
+# lại: 129 test cũ vẫn xanh với httpx 0.28.1).
+google-genai==2.12.*

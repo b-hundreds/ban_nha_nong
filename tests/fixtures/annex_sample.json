@@ -1,0 +1,76 @@
+{
+  "pages": [
+    {
+      "page": 0,
+      "rows": [
+        [
+          "TT",
+          "HOẠT CHẤT/\nTHUỐC BẢO VỆ THỰC\nVẬT KỸ THUẬT\n(COMMON NAME)",
+          "TÊN THƯƠNG PHẨM\n(TRADE NAME)",
+          "ĐỐI TƯỢNG PHÒNG TRỪ\n(PEST/ CROP)",
+          "T Ổ C H Ứ C Đ Ề N G H Ị ĐĂNG KÝ\n(APPLICANT)"
+        ],
+        ["I. THUỐC SỬ DỤNG TRONG NÔNG NGHIỆP:", null, null, null, null],
+        ["1. Thuốc trừ sâu:", null, null, null, null],
+        [null, null, "Ababetter 5EC", "nhện đỏ/ quýt; sâu cuốn lá/lúa", "Công ty TNHH MTV Lucky"],
+        [null, null, "Abacare 5EW", "nhện đỏ/ chè, cam", "Công ty CP ACE Biochem\nViệt Nam"],
+        [null, null, "Abafax 1.8EC", "sâu đục thân, sâu cuốn lá/ lúa; bọ cánh tơ/ chè", "Công ty TNHH SX - TM\nTô Ba"],
+        [null, null, "Abagold 65EC", "nhện gié, sâu cuốn lá/lúa; nhện đỏ/ cam; bọ trĩ/chè", "Công ty TNHH thuốc BVTV\nMekong"],
+        [null, null, "Abagro 4.0EC", "sâu cuốn lá/lúa; nhện đỏ/cam; sâu xanh/ lạc; bọ trĩ/\ndưa hấu; sâu vẽ bùa/ cà chua; bọ trĩ/ chè; sâu tơ/ cải\nbắp", "Asiagro Pacific Ltd"],
+        [null, null, "Abakill\n3.6EC, 10WP", "3 . 6 E C : rầy nâu, bọ trĩ, sâu cuốn lá/ lúa; bọ trĩ/ xoài;\nsâu vẽ bùa/ cam\n10WP: sâu cuốn lá, rầy nâu/ lúa; bọ trĩ/ dưa hấu; sâu\nvẽ bùa/ cam", "Công ty TNHH TM DV\nNông Hưng"],
+        [null, null, "Abamec-MQ\n50EC", "sâu khoang/lạc, nhện đỏ/chè", "Công ty CP Sunseaco\nViệt Nam"],
+        [null, null, "Abamine\n3.6EC, 5WG", "3.6EC: sâu tơ/ bắp cải, nhện đỏ/ cam, sâu xanh/ đậu\ntương, bọ trĩ/ dưa hấu, sâu đục ngọn/ điều; sâu cuốn\nlá, nhện gié/ lúa; bọ xít muỗi/điều\n5WG: sâu tơ/ bắp cải; nhện gié/ lúa", "Công ty CP Thanh Điền"],
+        [null, null, "Aba-navi 4.0EC", "nhện gié/ lúa", "Công ty CP Khử trùng Nam Việt"],
+        [null, null, "Abapro 5.8EC", "rầy xanh/ chè, sâu cuốn lá/ lúa, nhện đỏ/ cam", "Sundat (S) Pte Ltd"]
+      ]
+    },
+    {
+      "page": 6,
+      "rows": [
+        ["", "", "Phong Phú"],
+        ["Newsodant\n5.5EC, 5.5WG", "5.5EC: sâu cuốn lá, sâu đục bẹ, nhện gié, bọ trĩ/ lúa;\nsâu tơ, sâu xanh bướm trắng/ bắp cải; nhện đỏ, bọ\ntrĩ/ cam\n5.5WG: sâu vẽ bùa/cà chua; sâu xanh sọc trắng/dưa\nhấu", "Công ty TNHH TM SX\nKhánh Phong"],
+        ["Nimbus 6.0EC", "bọ trĩ, sâu cuốn lá nhỏ, sâu đục bẹ/ lúa; sâu tơ, sâu\nxanh/ bắp cải; dòi đục lá/ cà chua; sâu khoang/ lạc;\nsâu vẽ bùa, nhện đỏ/ cam; sâu đục quả/ vải; nhện\nđỏ, bọ cánh tơ/ chè; bọ trĩ/ dưa hấu", "Công ty TNHH VT BVTV\nPhương Mai"],
+        ["Nockout\n3.6GR, 3.6EC", "3.6GR: tuyến trùng/ cà phê\n3.6EC: sâu khoang/ cải bắp", "Công ty TNHH TM - DV\nThanh Sơn Hóa Nông"],
+        ["Novimec\n3.6EC", "sâu cuốn lá, sâu đục bẹ/ lúa; sâu tơ/ bắp cải; bọ trĩ/\ndưa hấu; nhện đỏ/ cam", "Công ty CP Nông Việt"],
+        ["Nouvo\n3.6EC", "bọ cánh tơ, nhện đỏ/ chè; sâu cuốn lá, rầy nâu/ lúa;\nbọ xít muỗi/điều; nhện đỏ/ quýt", "Công ty CP Nông dược HAI"],
+        ["NP Pheta 3.6EC", "sâu cuốn lá, nhện gié, rầy nâu/ lúa; sâu tơ, sâu xanh\nbướm trắng/ bắp cải; bọ trĩ/ dưa hấu; sâu xanh/ lạc,\nthuốc lá; dòi đục lá/ cà chua; rầy bông/ xoài; nhện\nđỏ, vẽ bùa/ cam", "Công ty CP Vật tư NN\nTiền Giang"],
+        ["N.Zigel 1.8 EC", "sâu khoang/lạc", "Công ty TNHH MTV\nNam Thịnh Hòa Bình"]
+      ]
+    },
+    {
+      "page": 146,
+      "rows": [
+        ["5", "Albendazole\n(min 98.8%)", "Abenix\n10SC", "đạo ôn, lem lép hạt, vàng lá vi khuẩn/ lúa; vàng lá,\nthán thư/hồ tiêu", "Công ty CP Nicotex"],
+        ["6", "Albendazole 100g/kg +\nTricyclazole 500g/kg", "Masterapc 600WG", "lem lép hạt/ lúa", "Công ty CP Quốc tế APC\nViệt Nam"],
+        ["7", "Amisulbrom\n(min 96.5%)", "Gekko 20SC", "sương mai/cà chua, ớt; giả sương mai/dưa chuột;\nsưng rễ/ bắp cải; xì mủ/ sầu riêng, cam, mít; chết\nnhanh/hồ tiêu", "Công ty TNHH Nissei\nCorporation Việt Nam"],
+        ["8", "Anacardic acid", "Amtech 100EW", "thối nhũn/ cải thảo, cải bắp; đốm vòng/ cà tím; giả\nsương mai/ dưa chuột, dưa lưới; thán thư/ thanh long,\nvải, xoài; loét/cam; sương mai/ cà chua, hành; thối\nbúp/ chè; mốc xám/dâu tây; héo xanh/ớt; mốc sương/\nnho; lem lép hạt/ lúa", "Công ty CP Nông nghiệp HP"],
+        [null, null, "Amistar®\n250 SC", "đốm vòng/ cà chua; mốc sương, lở cổ rễ/khoai tây;\nthối quả/ca cao; sương mai, thán thư/ dưa hấu; sương\nmai/ cà chua; đốm nâu/ thanh long; thán thư/cam,\nxoài, vải, ớt, sầu riêng; đốm lá sigatoka/chuối", "Công ty TNHH Syngenta\nViệt Nam"],
+        [null, null, "Amistic 250SC", "giả sương mai/dưa hấu", "Công ty CP Fujisan Nhật Bản"],
+        [null, null, "Anpro 250SC", "đốm vòng/cà chua; thán thư/xoài, vải", "Công ty CP Tập đoàn Lộc Trời"],
+        [null, null, "Asiwon 50WG", "sương mai/nho", "Công ty CP Agri Shop"]
+      ]
+    },
+    {
+      "page": 324,
+      "rows": [
+        [null, null, null, null, null, null, "Ratcom Plus\n0.005% Block Bait", null, null, "chuột/ đồng ruộng", null, null, "Công ty CP US Farm Việt Nam", null, null],
+        ["8", null, null, "Sulfur 33% + Carbon", null, null, "Woolf cygar\n33%", null, null, "chuột/ trong hang", null, null, "Công ty CP Giải pháp Nông\nnghiệp Tiên Tiến", null, null]
+      ]
+    }
+  ],
+  "pages_annex2": [
+    {
+      "page": 0,
+      "rows": [
+        ["TT", "HOẠT CHẤT/\nTHUỐC BẢO VỆ THỰC VẬT KỸ THUẬT (COMMON NAME)"],
+        ["Thuốc trừ sâu, thuốc bảo quản lâm sản", null],
+        ["1", "Aldrin"],
+        ["2", "BHC, Lindane"],
+        ["3", "Cadmium compound (Cd)"],
+        ["4", "Carbofuran"],
+        ["5", "Chlordane"],
+        ["6", "Chlordimeform"]
+      ]
+    }
+  ]
+}
