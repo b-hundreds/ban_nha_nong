@@ -78,13 +78,32 @@ class TtsRequest(BaseModel):
 
 
 class HandoffRequest(BaseModel):
+    """Request gửi ticket tới cán bộ khuyến nông.
+
+    Tương thích ngược: request cũ chỉ có session_id/transcript/slots vẫn hợp lệ.
+    Trường contact_name optional ở đây; handoff.py tự điền "Bà con chưa để lại tên" nếu thiếu.
+    """
+
     session_id: str | None = None
+    conversation_id: str | None = None
+    message_id: str | None = None
     transcript: str
+    question: str | None = None  # nội dung bác đã sửa trong form; rỗng → dùng transcript
     slots: Slots
+    contact_name: str | None = None  # bắt buộc từ form UI; thiếu → default tương thích ngược
+    contact_phone: str | None = None
+    contact_email: str | None = None
 
 
 class HandoffResponse(BaseModel):
     ticket_id: int
+
+
+class AnswerRequest(BaseModel):
+    """Body POST /api/officer/tickets/{id}/answer."""
+
+    answer: str = Field(min_length=1)
+    officer_name: str = Field(min_length=1)
 
 
 # Registry tool/API contracts. These are intentionally narrow: callers cannot

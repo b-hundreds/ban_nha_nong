@@ -2,7 +2,7 @@
 
 /* Cache tĩnh tối thiểu cho app shell — không bao giờ cache /api/*. */
 
-const CACHE_NAME = "bnn-shell-v7";
+const CACHE_NAME = "bnn-shell-v19";
 const SHELL_URLS = ["/", "/app.css", "/app.js", "/manifest.webmanifest", "/icon.svg"];
 
 self.addEventListener("install", (event) => {
@@ -29,6 +29,25 @@ self.addEventListener("fetch", (event) => {
 
   const url = new URL(request.url);
   if (url.pathname.startsWith("/api/")) return; // luôn qua mạng, không cache dữ liệu động
+  // Dashboard cán bộ luôn lấy bản mới nhất — tránh CSS/JS cũ dính cache khi đang chỉnh sửa
+  if (url.pathname.startsWith("/officer")) return;
+
+  // Dashboard cán bộ thay đổi thường xuyên và không tự nạp app.js của PWA chính.
+  // Ưu tiên mạng để tránh trả index/JS/CSS cũ; cache chỉ dùng khi thực sự offline.
+  if (url.pathname.startsWith("/officer")) {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          if (response && response.ok) {
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+          }
+          return response;
+        })
+        .catch(() => caches.match(request))
+    );
+    return;
+  }
 
   event.respondWith(
     caches.match(request).then((cached) => {

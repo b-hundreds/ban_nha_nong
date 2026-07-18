@@ -7,20 +7,21 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
+import app.backend.handoff as _handoff_module
 from app.backend import tts
-from app.backend.api import app, HANDOFF_DB
+from app.backend.api import app
 
 client = TestClient(app)
 
 
 @pytest.fixture(autouse=True)
-def _clean_handoff_db():
-    """Mỗi test bắt đầu với data/handoff.db sạch (không lẫn ticket giữa các test)."""
-    if HANDOFF_DB.exists():
-        HANDOFF_DB.unlink()
+def _clean_handoff_db(tmp_path, monkeypatch):
+    """Mỗi test dùng HANDOFF_DB riêng trong tmp_path — không đụng data/handoff.db thật."""
+    db_path = tmp_path / "handoff.db"
+    monkeypatch.setattr(_handoff_module, "HANDOFF_DB", db_path)
+    # Reset backoff state để tránh xuyên nhiễu giữa các test
+    monkeypatch.setattr(_handoff_module, "_classify_backoff_until", 0.0)
     yield
-    if HANDOFF_DB.exists():
-        HANDOFF_DB.unlink()
 
 
 def test_ask_lua_ray_nau_an_giang_tra_thuoc_that():
@@ -116,7 +117,7 @@ def test_handoff_tao_ticket_doc_lai_duoc():
     ticket_id = resp.json()["ticket_id"]
     assert isinstance(ticket_id, int)
 
-    conn = sqlite3.connect(HANDOFF_DB)
+    conn = sqlite3.connect(_handoff_module.HANDOFF_DB)  # dùng path đã monkeypatch
     row = conn.execute(
         "SELECT id, region, transcript, slots_json, status FROM tickets WHERE id = ?", (ticket_id,)
     ).fetchone()

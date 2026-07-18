@@ -4,33 +4,28 @@ Chạy demo: `uvicorn app.backend.api:app --reload` rồi mở http://localhost:
 """
 from __future__ import annotations
 
-import json
 import logging
 import os
-import sqlite3
-from datetime import date, datetime, timezone
-from pathlib import Path
+from datetime import date
 
 import httpx
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, HTTPException, Response, UploadFile
 from fastapi.staticfiles import StaticFiles
 
-from app.backend import asr, history, pipeline, registry_api, tts
+from app.backend import asr, handoff, history, pipeline, registry_api, tts
+from app.backend.handoff import HANDOFF_DB  # re-export cho test_api.py (tương thích ngược)
 from app.backend.schemas import (
     AskRequest,
     AskResponse,
-    HandoffRequest,
-    HandoffResponse,
     TranscribeResponse,
     TtsRequest,
 )
 
 load_dotenv()
 
-BASE_DIR = Path(__file__).resolve().parent.parent.parent
+BASE_DIR = __import__("pathlib").Path(__file__).resolve().parent.parent.parent
 WEB_DIR = BASE_DIR / "app" / "web"
-HANDOFF_DB = BASE_DIR / "data" / "handoff.db"
 
 TRANSCRIBE_UNAVAILABLE_MSG = "Dạ hiện em chưa nhận diện được giọng nói, bác gõ chữ giúp em nhé."
 TRANSCRIBE_FAILED_MSG = "Dạ em nhận diện giọng nói bị lỗi, bác thử lại hoặc gõ chữ giúp em nhé."
@@ -42,29 +37,21 @@ logger = logging.getLogger(__name__)
 app = FastAPI(title="Trợ lý nông nghiệp — API v0")
 app.include_router(history.router)
 app.include_router(registry_api.router)
-
-
-def _handoff_conn() -> sqlite3.Connection:
-    HANDOFF_DB.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(HANDOFF_DB)
-    conn.execute(
-        """CREATE TABLE IF NOT EXISTS tickets (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            ts TEXT NOT NULL,
-            region TEXT,
-            transcript TEXT NOT NULL,
-            slots_json TEXT NOT NULL,
-            status TEXT NOT NULL DEFAULT 'pending'
-        )"""
-    )
-    conn.commit()
-    return conn
+app.include_router(handoff.router)
 
 
 @app.post("/api/ask", response_model=AskResponse)
 def ask(req: AskRequest) -> AskResponse:
     result = pipeline.answer(req.text, req.region, date.today().isoformat(), session_id=req.session_id)
-    return AskResponse(**result)
+    response = AskResponse(**result)
+    # Ghi log câu hỏi vào question_log — best-effort, lỗi nuốt bên trong log_question
+    handoff.log_question(
+        region=response.slots.region,
+        crop=response.slots.crop,
+        pest=response.slots.pest,
+        text=req.text,
+    )
+    return response
 
 
 @app.post("/api/transcribe", response_model=TranscribeResponse)
@@ -119,26 +106,6 @@ async def synthesize_speech(req: TtsRequest) -> Response:
         media_type="audio/mpeg",
         headers={"Cache-Control": "private, max-age=3600"},
     )
-
-
-@app.post("/api/handoff", response_model=HandoffResponse)
-def handoff(req: HandoffRequest) -> HandoffResponse:
-    conn = _handoff_conn()
-    try:
-        cur = conn.execute(
-            "INSERT INTO tickets (ts, region, transcript, slots_json, status) VALUES (?, ?, ?, ?, 'pending')",
-            (
-                datetime.now(timezone.utc).isoformat(),
-                req.slots.region,
-                req.transcript,
-                json.dumps(req.slots.model_dump(), ensure_ascii=False),
-            ),
-        )
-        conn.commit()
-        ticket_id = cur.lastrowid
-    finally:
-        conn.close()
-    return HandoffResponse(ticket_id=ticket_id)
 
 
 # Đăng ký API routes xong mới mount static — mount "/" chỉ bắt các path không khớp

@@ -32,6 +32,9 @@ const state = {
   draftRegion: loadRegion(),
   isBusy: false,
   editingMessageId: null,
+  view: "chat",
+  inboxDetailMsg: null,
+  inboxSearch: "",
 };
 
 const speechState = {
@@ -55,6 +58,8 @@ function init() {
     "sidebar", "sidebarOpen", "sidebarClose", "sidebarScrim", "brandHome",
     "conversationTitle", "conversationTitleBtn", "titleEdit", "titleInput",
     "regionMenu", "regionName", "composer", "textInput", "sendTextBtn", "micBtn",
+    "notifBtn", "notifBadge", "composerWrap", "mainPanel",
+    "inboxSidebarBtn", "inboxSidebarBadge",
   ].forEach((id) => { els[id] = document.getElementById(id); });
   els.regionBtns = Array.from(document.querySelectorAll("[data-region-btn]"));
 
@@ -68,6 +73,8 @@ function init() {
   els.sidebarScrim.addEventListener("click", closeSidebar);
   els.regionBtns.forEach((button) => button.addEventListener("click", () => setRegion(button.dataset.regionBtn)));
   els.conversationTitleBtn.addEventListener("click", beginTitleEdit);
+  els.notifBtn.addEventListener("click", openInboxView);
+  if (els.inboxSidebarBtn) els.inboxSidebarBtn.addEventListener("click", openInboxView);
   els.titleEdit.addEventListener("submit", finishTitleEdit);
   els.titleInput.addEventListener("keydown", (event) => {
     if (event.key === "Escape") cancelTitleEdit();
@@ -96,6 +103,7 @@ function init() {
   renderAll();
   updateSendState();
   registerServiceWorker();
+  setInterval(pollHandoffTickets, 30000);
   loadConversationsFromServer();
 }
 
@@ -144,6 +152,7 @@ async function loadConversationsFromServer() {
     if (conversations.length === 0) conversations = await migrateLocalStorageOnce();
     state.conversations = repairLoadingMessages(conversations);
     renderAll();
+    pollHandoffTickets();
   } catch (_error) {
     setStatus("Không tải được lịch sử từ máy chủ.");
   }
@@ -211,6 +220,9 @@ function startNewConversation() {
   if (active) state.draftRegion = active.region;
   state.activeId = null;
   state.editingMessageId = null;
+  state.view = "chat";
+  state.inboxDetailMsg = null;
+  state.inboxSearch = "";
   cancelTitleEdit();
   closeSidebar();
   updateRegionUI();
@@ -222,6 +234,9 @@ function openConversation(id) {
   if (!state.conversations.some((conversation) => conversation.id === id)) return;
   state.activeId = id;
   state.editingMessageId = null;
+  state.view = "chat";
+  state.inboxDetailMsg = null;
+  state.inboxSearch = "";
   const conversation = getActiveConversation();
   state.draftRegion = conversation.region;
   localStorage.setItem(REGION_KEY, state.draftRegion);
@@ -320,16 +335,28 @@ function updateRegionUI() {
 function renderAll() {
   renderHistory();
   updateHeader();
-  renderChat();
+  if (state.view === "inbox") {
+    renderInboxView();
+  } else {
+    if (els.mainPanel) els.mainPanel.classList.remove("inbox-mode");
+    renderChat();
+  }
+  updateNotifBadge();
 }
 
 function updateHeader() {
+  if (state.view === "inbox") {
+    els.conversationTitle.textContent = "Hộp thư khuyến nông";
+    els.conversationTitleBtn.disabled = true;
+    return;
+  }
   const conversation = getActiveConversation();
   els.conversationTitle.textContent = conversation?.title || "Cuộc trò chuyện mới";
   els.conversationTitleBtn.disabled = !conversation;
 }
 
 function renderHistory() {
+  if (els.inboxSidebarBtn) els.inboxSidebarBtn.classList.toggle("is-active", state.view === "inbox");
   els.conversationList.replaceChildren();
   els.historyCount.textContent = String(state.conversations.length);
   if (!state.conversations.length) {
@@ -588,7 +615,7 @@ function renderAssistantMessage(message, conversation) {
   if (doseSegments.length) row.appendChild(renderDoseList(doseSegments, answerRegion));
   if (citationSegments.length) row.appendChild(renderCitations(citationSegments));
   segments.filter((segment) => segment.type === "abstain").forEach((segment) => {
-    row.appendChild(renderHandoff(segment, message.answer, message.text, conversation));
+    row.appendChild(renderHandoff(segment, message.answer, message.text, conversation, message));
   });
   const speechText = answerSpeechText(message.answer);
   if (speechText) row.appendChild(renderSpeechButton(speechText));
@@ -900,42 +927,220 @@ function renderCitations(segments) {
   return list;
 }
 
-function renderHandoff(segment, answer, sourceText, conversation) {
+function renderHandoff(segment, answer, sourceText, conversation, message) {
   const panel = document.createElement("section");
   panel.className = "handoff-panel";
   const reason = document.createElement("p");
   reason.className = "handoff-reason";
   reason.textContent = segment.reason;
+  panel.appendChild(reason);
+
+  if (message && message.handoff && message.handoff.status === "answered") {
+    panel.appendChild(renderOfficerReply(message.handoff));
+    return panel;
+  }
+
+  if (message && message.handoff && message.handoff.status === "pending") {
+    panel.appendChild(renderHandoffSent(message.handoff.ticketId));
+    return panel;
+  }
+
   const button = document.createElement("button");
   button.type = "button";
   button.className = "handoff-btn";
-  button.textContent = "Chuyển cán bộ khuyến nông";
-  const result = document.createElement("p");
-  result.className = "handoff-result";
-  result.hidden = true;
-  button.addEventListener("click", async () => {
-    button.disabled = true;
-    button.textContent = "Đang gửi...";
+  button.textContent = "Gửi cán bộ khuyến nông";
+  button.addEventListener("click", () => {
+    showHandoffFormModal(sourceText, answer, conversation, message, (ticketId) => {
+      button.replaceWith(renderHandoffSent(ticketId));
+    });
+  });
+  panel.appendChild(button);
+  return panel;
+}
+
+function renderHandoffSent(ticketId) {
+  const sent = document.createElement("p");
+  sent.className = "handoff-sent";
+  sent.textContent = `Đã gửi cán bộ khuyến nông — mã #${ticketId}. Khi có trả lời, app sẽ báo ngay tại đây (và qua Zalo/email nếu bác để lại).`;
+  return sent;
+}
+
+function renderOfficerReply(handoff) {
+  const block = document.createElement("div");
+  block.className = "officer-reply";
+  const heading = document.createElement("p");
+  heading.className = "officer-reply-heading";
+  heading.textContent = "🧑‍🌾 Trả lời từ cán bộ khuyến nông";
+  const answerText = document.createElement("p");
+  answerText.className = "officer-reply-text";
+  answerText.textContent = handoff.answer || "";
+  const byLine = document.createElement("p");
+  byLine.className = "officer-reply-by";
+  if (handoff.answeredBy) byLine.textContent = `— ${handoff.answeredBy}`;
+  block.append(heading, answerText, byLine);
+  return block;
+}
+
+function showHandoffFormModal(sourceText, answer, conversation, message, onSuccess) {
+  const overlay = document.createElement("div");
+  overlay.className = "handoff-modal-overlay";
+  overlay.setAttribute("role", "dialog");
+  overlay.setAttribute("aria-modal", "true");
+  overlay.setAttribute("aria-labelledby", "handoff-form-modal-title");
+
+  const dialog = document.createElement("div");
+  dialog.className = "handoff-modal";
+
+  const title = document.createElement("h2");
+  title.className = "handoff-modal-title";
+  title.id = "handoff-form-modal-title";
+  title.textContent = "Gửi câu hỏi đến cán bộ khuyến nông";
+
+  const form = document.createElement("form");
+  form.className = "handoff-form";
+  form.noValidate = true;
+
+  const nameLabel = document.createElement("label");
+  nameLabel.className = "handoff-field";
+  const nameSpan = document.createElement("span");
+  nameSpan.textContent = "Họ tên";
+  const nameInput = document.createElement("input");
+  nameInput.type = "text";
+  nameInput.name = "contact_name";
+  nameInput.placeholder = "Tên của bác";
+  nameInput.maxLength = 100;
+  nameInput.autocomplete = "name";
+  nameLabel.append(nameSpan, nameInput);
+
+  const phoneLabel = document.createElement("label");
+  phoneLabel.className = "handoff-field";
+  const phoneSpan = document.createElement("span");
+  phoneSpan.textContent = "SĐT / Zalo";
+  const phoneInput = document.createElement("input");
+  phoneInput.type = "tel";
+  phoneInput.name = "contact_phone";
+  phoneInput.placeholder = "Số điện thoại để cán bộ liên hệ";
+  phoneInput.maxLength = 20;
+  phoneInput.autocomplete = "tel";
+  phoneLabel.append(phoneSpan, phoneInput);
+
+  const emailLabel = document.createElement("label");
+  emailLabel.className = "handoff-field";
+  const emailSpan = document.createElement("span");
+  emailSpan.textContent = "Email (không bắt buộc)";
+  const emailInput = document.createElement("input");
+  emailInput.type = "email";
+  emailInput.name = "contact_email";
+  emailInput.placeholder = "email@example.com";
+  emailInput.maxLength = 200;
+  emailInput.autocomplete = "email";
+  emailLabel.append(emailSpan, emailInput);
+
+  const questionLabel = document.createElement("label");
+  questionLabel.className = "handoff-field";
+  const questionSpan = document.createElement("span");
+  questionSpan.textContent = "Nội dung câu hỏi";
+  const questionInput = document.createElement("textarea");
+  questionInput.name = "question";
+  questionInput.rows = 3;
+  questionInput.maxLength = 2000;
+  questionInput.value = sourceText;
+  questionLabel.append(questionSpan, questionInput);
+
+  const validationMsg = document.createElement("p");
+  validationMsg.className = "handoff-validation";
+  validationMsg.hidden = true;
+
+  const actions = document.createElement("div");
+  actions.className = "handoff-modal-actions";
+  const cancelBtn = document.createElement("button");
+  cancelBtn.type = "button";
+  cancelBtn.className = "small-btn";
+  cancelBtn.textContent = "Huỷ";
+  const submitBtn = document.createElement("button");
+  submitBtn.type = "submit";
+  submitBtn.className = "small-btn primary";
+  submitBtn.textContent = "Gửi cán bộ khuyến nông";
+  actions.append(cancelBtn, submitBtn);
+
+  form.append(nameLabel, phoneLabel, emailLabel, questionLabel, validationMsg, actions);
+  dialog.append(title, form);
+  overlay.appendChild(dialog);
+  document.body.appendChild(overlay);
+
+  requestAnimationFrame(() => nameInput.focus());
+
+  let closed = false;
+  function doClose() {
+    if (closed) return;
+    closed = true;
+    document.removeEventListener("keydown", onKeydown);
+    overlay.remove();
+  }
+
+  function onKeydown(event) {
+    if (event.key === "Escape") doClose();
+  }
+
+  cancelBtn.addEventListener("click", doClose);
+  overlay.addEventListener("click", (event) => { if (event.target === overlay) doClose(); });
+  document.addEventListener("keydown", onKeydown);
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const name = nameInput.value.trim();
+    const phone = phoneInput.value.trim();
+    const email = emailInput.value.trim();
+    const question = questionInput.value.trim() || sourceText;
+
+    if (!name) {
+      validationMsg.textContent = "Bác vui lòng điền họ tên để cán bộ biết cách xưng hô.";
+      validationMsg.hidden = false;
+      nameInput.focus();
+      return;
+    }
+    validationMsg.hidden = true;
+    submitBtn.disabled = true;
+    cancelBtn.disabled = true;
+    submitBtn.textContent = "Đang gửi...";
+
     try {
+      const body = {
+        session_id: conversation.sessionId,
+        conversation_id: conversation.id,
+        transcript: sourceText,
+        question,
+        slots: answer ? answer.slots : {},
+        contact_name: name,
+      };
+      if (phone) body.contact_phone = phone;
+      if (email) body.contact_email = email;
+      if (message && message.id) body.message_id = message.id;
+
       const response = await fetch("/api/handoff", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ session_id: conversation.sessionId, transcript: sourceText, slots: answer.slots }),
+        body: JSON.stringify(body),
       });
       if (!response.ok) throw new Error("handoff failed");
       const data = await response.json();
-      button.textContent = "Đã chuyển cán bộ";
-      result.textContent = `Mã yêu cầu #${data.ticket_id}`;
-      result.hidden = false;
+      const ticketId = data.ticket_id;
+
+      if (message) {
+        message.handoff = { ticketId, question, status: "pending" };
+        saveConversations(conversation);
+      }
+      doClose();
+      showToast(`✓ Đã gửi cán bộ khuyến nông — mã #${ticketId}. Khi có trả lời, app sẽ báo ngay tại đây.`);
+      onSuccess(ticketId);
     } catch (_error) {
-      button.disabled = false;
-      button.textContent = "Thử chuyển lại";
-      result.textContent = "Chưa gửi được yêu cầu.";
-      result.hidden = false;
+      submitBtn.disabled = false;
+      cancelBtn.disabled = false;
+      submitBtn.textContent = "Thử gửi lại";
+      validationMsg.textContent = "Chưa gửi được yêu cầu. Bác thử lại sau ít phút.";
+      validationMsg.hidden = false;
     }
   });
-  panel.append(reason, button, result);
-  return panel;
 }
 
 function submitTypedText(event) {
@@ -1266,6 +1471,376 @@ function closeSidebar() {
 
 async function safeJson(response) {
   try { return await response.json(); } catch (_error) { return {}; }
+}
+
+function showToast(message, type, onClick) {
+  const toast = document.createElement("div");
+  toast.className = `toast toast-${type || "success"}`;
+  toast.textContent = message;
+  if (onClick) {
+    toast.classList.add("toast-clickable");
+    toast.addEventListener("click", () => {
+      clearTimeout(timer);
+      toast.remove();
+      onClick();
+    });
+  }
+  document.body.appendChild(toast);
+  void toast.offsetHeight; // trigger reflow so transition fires
+  toast.classList.add("toast-visible");
+  let timer = setTimeout(() => {
+    toast.classList.remove("toast-visible");
+    toast.addEventListener("transitionend", () => toast.remove(), { once: true });
+  }, 3600);
+  return () => { clearTimeout(timer); toast.remove(); };
+}
+
+async function pollHandoffTickets() {
+  const pending = [];
+  state.conversations.forEach((conv) => {
+    conv.messages.forEach((msg) => {
+      if (msg.handoff && msg.handoff.status === "pending" && msg.handoff.ticketId != null) {
+        pending.push({ conv, msg, ticketId: String(msg.handoff.ticketId) });
+      }
+    });
+  });
+  if (!pending.length) return;
+
+  const ids = pending.map((p) => p.ticketId).join(",");
+  try {
+    const resp = await fetch(`/api/handoff/status?ids=${encodeURIComponent(ids)}`);
+    if (!resp.ok) return;
+    const data = await resp.json();
+    const tickets = Array.isArray(data.tickets) ? data.tickets : [];
+    let newlyAnswered = 0;
+    tickets.forEach((ticket) => {
+      if (ticket.status !== "answered") return;
+      const item = pending.find((p) => String(p.ticketId) === String(ticket.ticket_id));
+      if (!item) return;
+      item.msg.handoff = {
+        ...item.msg.handoff,
+        answer: ticket.answer,
+        answeredBy: ticket.answered_by,
+        answeredAt: ticket.answered_at,
+        status: "answered",
+      };
+      saveConversations(item.conv);
+      if (state.activeId === item.conv.id) renderChat();
+      if (!ticket.seen) newlyAnswered++;
+    });
+    updateNotifBadge();
+    if (newlyAnswered > 0) showToast("Cán bộ khuyến nông vừa trả lời câu hỏi của bác", "success", openInboxView);
+  } catch (_err) {
+    // fail silently
+  }
+}
+
+function normalizeText(str) {
+  if (!str) return "";
+  return str
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[đĐ]/g, "d")
+    .toLowerCase();
+}
+
+function timeAgo(isoStr) {
+  if (!isoStr) return "";
+  const diff = Date.now() - new Date(isoStr).getTime();
+  const min = Math.floor(diff / 60000);
+  if (min < 1) return "vừa xong";
+  if (min < 60) return `${min} phút trước`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr} giờ trước`;
+  const day = Math.floor(hr / 24);
+  if (day === 1) return "hôm qua";
+  return `${day} ngày trước`;
+}
+
+function countUnseenAnswered() {
+  let count = 0;
+  state.conversations.forEach((conv) => {
+    conv.messages.forEach((msg) => {
+      if (msg.handoff && msg.handoff.status === "answered" && !msg.handoff.seen) count++;
+    });
+  });
+  return count;
+}
+
+function updateNotifBadge() {
+  const count = countUnseenAnswered();
+  if (els.notifBadge) {
+    if (count > 0) {
+      els.notifBadge.textContent = count > 9 ? "9+" : String(count);
+      els.notifBadge.hidden = false;
+    } else {
+      els.notifBadge.hidden = true;
+    }
+  }
+  if (els.inboxSidebarBadge) {
+    if (count > 0) {
+      els.inboxSidebarBadge.textContent = count > 9 ? "9+" : String(count);
+      els.inboxSidebarBadge.hidden = false;
+    } else {
+      els.inboxSidebarBadge.hidden = true;
+    }
+  }
+}
+
+function getAllHandoffTickets() {
+  const items = [];
+  state.conversations.forEach((conv) => {
+    conv.messages.forEach((msg) => {
+      if (msg.handoff && msg.handoff.ticketId != null) items.push({ conv, msg });
+    });
+  });
+  items.sort((a, b) => {
+    const ta = a.msg.handoff.answeredAt || a.msg.createdAt || "";
+    const tb = b.msg.handoff.answeredAt || b.msg.createdAt || "";
+    return String(tb).localeCompare(String(ta));
+  });
+  return items;
+}
+
+function openInboxView() {
+  state.view = "inbox";
+  state.inboxDetailMsg = null;
+  state.inboxSearch = "";
+  cancelTitleEdit();
+  closeSidebar();
+  renderAll();
+}
+
+function openInboxDetail(conv, msg) {
+  state.inboxDetailMsg = { conv, msg };
+  if (msg.handoff && msg.handoff.status === "answered" && !msg.handoff.seen) {
+    msg.handoff.seen = true;
+    saveConversations(conv);
+    fetch(`/api/handoff/${msg.handoff.ticketId}/seen`, { method: "POST" }).catch(() => {});
+    updateNotifBadge();
+  }
+  renderAll();
+}
+
+function renderInboxView() {
+  if (els.mainPanel) els.mainPanel.classList.add("inbox-mode");
+  if (state.inboxDetailMsg) {
+    renderInboxDetail(state.inboxDetailMsg.conv, state.inboxDetailMsg.msg);
+  } else {
+    renderInboxList();
+  }
+}
+
+function renderInboxList() {
+  els.chat.replaceChildren();
+  const wrap = document.createElement("div");
+  wrap.className = "inbox-wrap";
+
+  const header = document.createElement("div");
+  header.className = "inbox-list-header";
+  const h = document.createElement("h2");
+  h.className = "inbox-title";
+  h.textContent = "Hộp thư khuyến nông";
+  header.appendChild(h);
+  wrap.appendChild(header);
+
+  // Search bar
+  const searchWrap = document.createElement("div");
+  searchWrap.className = "inbox-search-wrap";
+  const searchIconEl = icon("search", "inbox-search-icon");
+  const searchInput = document.createElement("input");
+  searchInput.type = "text";
+  searchInput.className = "inbox-search-input";
+  searchInput.placeholder = "Tìm trong hộp thư...";
+  searchInput.value = state.inboxSearch;
+  searchInput.autocomplete = "off";
+  searchInput.setAttribute("spellcheck", "false");
+  const clearBtn = document.createElement("button");
+  clearBtn.type = "button";
+  clearBtn.className = "inbox-search-clear";
+  clearBtn.setAttribute("aria-label", "Xoá tìm kiếm");
+  clearBtn.appendChild(icon("close"));
+  clearBtn.hidden = !state.inboxSearch;
+  searchInput.addEventListener("input", () => {
+    state.inboxSearch = searchInput.value;
+    clearBtn.hidden = !searchInput.value;
+    renderInboxItems(itemsContainer);
+  });
+  clearBtn.addEventListener("click", () => {
+    state.inboxSearch = "";
+    searchInput.value = "";
+    clearBtn.hidden = true;
+    searchInput.focus();
+    renderInboxItems(itemsContainer);
+  });
+  searchWrap.append(searchIconEl, searchInput, clearBtn);
+  wrap.appendChild(searchWrap);
+
+  // Items container — stable reference so search updates don't destroy the input
+  const itemsContainer = document.createElement("div");
+  renderInboxItems(itemsContainer);
+  wrap.appendChild(itemsContainer);
+
+  els.chat.appendChild(wrap);
+}
+
+function renderInboxItems(container) {
+  container.replaceChildren();
+  const query = normalizeText(state.inboxSearch);
+  const allItems = getAllHandoffTickets();
+  const items = query
+    ? allItems.filter(({ msg }) => {
+        const h = msg.handoff;
+        return [h.question, h.answer, h.answeredBy, msg.text]
+          .filter(Boolean)
+          .some((field) => normalizeText(field).includes(query));
+      })
+    : allItems;
+
+  if (!items.length) {
+    const empty = document.createElement("div");
+    empty.className = "inbox-empty";
+    if (!allItems.length) {
+      const p1 = document.createElement("p");
+      p1.textContent = "Bác chưa gửi câu hỏi nào cho cán bộ khuyến nông.";
+      const p2 = document.createElement("p");
+      p2.className = "inbox-empty-hint";
+      p2.textContent = "Khi bot không trả lời được, bấm \"Gửi cán bộ khuyến nông\" trong hội thoại.";
+      empty.append(icon("bell"), p1, p2);
+    } else {
+      const p1 = document.createElement("p");
+      p1.textContent = `Không tìm thấy thư nào khớp "${state.inboxSearch}"`;
+      empty.append(icon("search"), p1);
+    }
+    container.appendChild(empty);
+    return;
+  }
+
+  const list = document.createElement("div");
+  list.className = "inbox-list";
+  items.forEach(({ conv, msg }) => {
+    const isUnread = msg.handoff.status === "answered" && !msg.handoff.seen;
+    const row = document.createElement("button");
+    row.type = "button";
+    row.className = "inbox-row" + (isUnread ? " inbox-row-unread" : "");
+
+    const subject = document.createElement("p");
+    subject.className = "inbox-subject";
+    subject.textContent = msg.handoff.question || msg.text || "";
+
+    const snippet = document.createElement("p");
+    snippet.className = "inbox-snippet" + (msg.handoff.status !== "answered" ? " inbox-snippet-pending" : "");
+    snippet.textContent = (msg.handoff.status === "answered" && msg.handoff.answer)
+      ? msg.handoff.answer
+      : "Cán bộ sẽ trả lời sớm…";
+
+    const right = document.createElement("div");
+    right.className = "inbox-right";
+
+    const chip = document.createElement("span");
+    chip.className = `inbox-chip inbox-chip-${msg.handoff.status}`;
+    chip.textContent = msg.handoff.status === "answered" ? "Đã trả lời" : "Chờ trả lời";
+
+    const time = document.createElement("span");
+    time.className = "inbox-time";
+    time.textContent = timeAgo(msg.handoff.answeredAt || msg.createdAt || "");
+
+    right.append(chip, time);
+    row.append(subject, snippet, right);
+    row.addEventListener("click", () => openInboxDetail(conv, msg));
+    list.appendChild(row);
+  });
+  container.appendChild(list);
+}
+
+function renderInboxDetail(conv, msg) {
+  els.chat.replaceChildren();
+  const wrap = document.createElement("div");
+  wrap.className = "inbox-wrap inbox-detail-wrap";
+
+  const backBtn = document.createElement("button");
+  backBtn.type = "button";
+  backBtn.className = "inbox-back-btn";
+  backBtn.append(icon("chevron", "inbox-back-chevron"), document.createTextNode("Danh sách"));
+  backBtn.addEventListener("click", () => {
+    state.inboxDetailMsg = null;
+    renderAll();
+  });
+  wrap.appendChild(backBtn);
+
+  // Question block
+  const qBlock = document.createElement("div");
+  qBlock.className = "inbox-detail-question";
+
+  const qLabelRow = document.createElement("div");
+  qLabelRow.className = "inbox-detail-label-row";
+  const qLabel = document.createElement("p");
+  qLabel.className = "inbox-detail-label";
+  qLabel.textContent = "Câu hỏi của bác";
+  const qTime = document.createElement("span");
+  qTime.className = "inbox-detail-time";
+  qTime.textContent = msg.createdAt ? timeAgo(msg.createdAt) : "";
+  qLabelRow.append(qLabel, qTime);
+
+  const qText = document.createElement("p");
+  qText.className = "inbox-detail-text";
+  qText.textContent = msg.handoff.question || msg.text || "";
+
+  qBlock.append(qLabelRow, qText);
+  wrap.appendChild(qBlock);
+
+  // Answer block
+  const aBlock = document.createElement("div");
+  aBlock.className = "inbox-detail-answer";
+
+  if (msg.handoff.status === "answered" && msg.handoff.answer) {
+    const aLabelRow = document.createElement("div");
+    aLabelRow.className = "inbox-detail-label-row";
+    const aLabel = document.createElement("p");
+    aLabel.className = "inbox-detail-label";
+    aLabel.textContent = "Cán bộ khuyến nông";
+    const aTime = document.createElement("span");
+    aTime.className = "inbox-detail-time";
+    aTime.textContent = msg.handoff.answeredAt ? timeAgo(msg.handoff.answeredAt) : "";
+    aLabelRow.append(aLabel, aTime);
+
+    const aText = document.createElement("p");
+    aText.className = "inbox-detail-text";
+    aText.textContent = msg.handoff.answer;
+
+    aBlock.append(aLabelRow, aText);
+
+    if (msg.handoff.answeredBy) {
+      const aBy = document.createElement("p");
+      aBy.className = "inbox-detail-by";
+      aBy.textContent = `— ${msg.handoff.answeredBy}`;
+      aBlock.appendChild(aBy);
+    }
+  } else {
+    const pending = document.createElement("p");
+    pending.className = "inbox-detail-pending";
+    pending.textContent = "Cán bộ đang chuẩn bị trả lời câu hỏi của bác…";
+    aBlock.appendChild(pending);
+  }
+  wrap.appendChild(aBlock);
+
+  // Link to original conversation
+  const convLink = document.createElement("button");
+  convLink.type = "button";
+  convLink.className = "inbox-detail-conv-link";
+  convLink.textContent = "Xem hội thoại gốc →";
+  convLink.addEventListener("click", () => {
+    state.view = "chat";
+    state.inboxDetailMsg = null;
+    openConversation(conv.id);
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      const el = els.chat.querySelector(`[data-message-id="${msg.id}"]`);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }));
+  });
+  wrap.appendChild(convLink);
+
+  els.chat.appendChild(wrap);
 }
 
 function registerServiceWorker() {
