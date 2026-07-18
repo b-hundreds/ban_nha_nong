@@ -75,6 +75,77 @@ def build_kb(md_paths: list[Path], out_path: Path) -> sqlite3.Connection:
     return conn
 
 
+REQUIRED_MANUAL_META = ("doc_id", "authority_level", "url")
+
+
+def _validate_manual_meta(path: Path, meta: dict) -> None:
+    missing = [key for key in REQUIRED_MANUAL_META if not meta.get(key)]
+    if missing:
+        raise ValueError(f"{path}: thiếu metadata bắt buộc: {', '.join(missing)}")
+
+
+def _delete_doc(conn: sqlite3.Connection, doc_id: str) -> None:
+    """Xóa một tài liệu và index liên quan, kể cả vector nếu bảng đã tồn tại."""
+    rows = conn.execute(
+        "SELECT id, text FROM chunks WHERE doc_id = ?", (doc_id,)
+    ).fetchall()
+    if not rows:
+        return
+
+    has_vectors = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='chunk_vectors'"
+    ).fetchone()
+    if has_vectors:
+        conn.executemany(
+            "DELETE FROM chunk_vectors WHERE chunk_id = ?",
+            [(row[0],) for row in rows],
+        )
+
+    # chunks_fts là FTS5 contentless nên phải dùng lệnh delete đặc biệt và
+    # cung cấp lại token cũ, không thể DELETE FROM trực tiếp.
+    conn.executemany(
+        "INSERT INTO chunks_fts(chunks_fts, rowid, text_tok) VALUES('delete', ?, ?)",
+        [(row[0], _tok(row[1])) for row in rows],
+    )
+    conn.execute("DELETE FROM chunks WHERE doc_id = ?", (doc_id,))
+
+
+def upsert_manual_docs(conn: sqlite3.Connection, md_paths: list[Path]) -> int:
+    """Thêm/cập nhật tài liệu thủ công mà không rebuild toàn bộ KB.
+
+    Mỗi ``doc_id`` được thay thế nguyên tử. Vector cũ của tài liệu được xóa để
+    ``ingest.build_kb_dense`` chỉ tạo lại embedding cho các chunk vừa thay đổi.
+    Hàm trả về tổng số chunk mới được chèn.
+    """
+    parsed = []
+    seen_doc_ids = set()
+    for raw_path in md_paths:
+        path = Path(raw_path)
+        meta, sections = parse_manual_md(path)
+        _validate_manual_meta(path, meta)
+        doc_id = meta["doc_id"]
+        if doc_id in seen_doc_ids:
+            raise ValueError(f"doc_id bị trùng trong cùng đợt ingest: {doc_id}")
+        seen_doc_ids.add(doc_id)
+        chunks = chunk_sections(meta, sections)
+        if not chunks:
+            raise ValueError(f"{path}: tài liệu không có section/nội dung để ingest")
+        parsed.append((doc_id, chunks))
+
+    inserted = 0
+    try:
+        for doc_id, chunks in parsed:
+            _delete_doc(conn, doc_id)
+            for chunk in chunks:
+                _insert_chunk(conn, chunk)
+            inserted += len(chunks)
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    return inserted
+
+
 def search_bm25(conn, query: str, k: int = 20, region: str | None = None, crop: str | None = None):
     q = " OR ".join(t for t in _tok(query).split() if len(t) > 1)
     rows = conn.execute(

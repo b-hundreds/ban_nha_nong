@@ -57,12 +57,18 @@ def test_sidebar_va_composer_khong_lam_no_chieu_cao():
 
 
 def test_service_worker_doi_cache_sau_khi_sua_layout():
-    assert 'CACHE_NAME = "bnn-shell-v25"' in SERVICE_WORKER
-    assert '"/chat?app=v25"' in SERVICE_WORKER
+    assert 'CACHE_NAME = "bnn-shell-v26"' in SERVICE_WORKER
+    assert '"/chat?app=v26"' in SERVICE_WORKER
     assert 'request.mode === "navigate" || CHAT_SHELL_PATHS.has(url.pathname)' in SERVICE_WORKER
 
 
 def test_chat_assets_va_link_landing_co_version_de_bo_qua_cache_cu():
-    assert 'href="app.css?v=25"' in INDEX
-    assert 'src="app.js?v=25"' in INDEX
-    assert 'href="/chat?app=v25"' in LANDING
+    assert 'href="app.css?v=26"' in INDEX
+    assert 'src="app.js?v=26"' in INDEX
+    assert 'href="/chat?app=v26"' in LANDING
+
+
+def test_uploaded_images_are_right_aligned_above_user_message():
+    assert ".user-image-gallery" in CSS
+    assert "justify-content: flex-end" in CSS
+    assert "flex: 0 1 160px" in CSS

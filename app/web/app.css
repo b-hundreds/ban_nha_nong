@@ -738,15 +738,17 @@ svg {
 }
 
 .user-image-gallery {
-  display: grid;
-  max-width: min(86%, 620px);
-  grid-template-columns: repeat(3, minmax(0, 160px));
+  display: flex;
+  width: min(86%, 620px);
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 6px;
   margin-bottom: 6px;
 }
 
 .user-image-gallery img {
-  width: 100%;
+  width: min(160px, 100%);
+  flex: 0 1 160px;
   aspect-ratio: 4 / 3;
   border-radius: 10px;
   object-fit: cover;
@@ -1306,6 +1308,7 @@ svg {
   .thread { padding-top: 24px; padding-bottom: 44px; }
   .exchange { margin-bottom: 28px; }
   .user-bubble,
+  .user-image-gallery,
   .edit-message-form,
   .revision-panel { max-width: 92%; width: auto; }
   .message-tools { opacity: 1; }

@@ -2,11 +2,11 @@
 
 /* Cache tĩnh tối thiểu cho app shell — không bao giờ cache /api/*. */
 
-const CACHE_NAME = "bnn-shell-v25";
+const CACHE_NAME = "bnn-shell-v26";
 const SHELL_URLS = [
-  "/chat?app=v25",
-  "/app.css?v=25",
-  "/app.js?v=25",
+  "/chat?app=v26",
+  "/app.css?v=26",
+  "/app.js?v=26",
   "/manifest.webmanifest",
   "/icon.svg",
 ];

@@ -15,7 +15,7 @@ client = TestClient(app)
 
 
 def test_chat_va_service_worker_khong_bi_http_cache_cu_de_len() -> None:
-    chat_response = client.get("/chat?app=v25")
+    chat_response = client.get("/chat?app=v26")
     assert chat_response.status_code == 200
     assert "no-store" in chat_response.headers.get("cache-control", "")
 
