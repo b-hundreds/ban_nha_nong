@@ -445,7 +445,12 @@ def _format_dose_text(dose) -> str:
 
 
 def _path_a_segments(
-    region_name: str, crop: str, pest: str, hits: list, multi_crop_note: str | None = None
+    region_name: str,
+    crop: str,
+    pest: str,
+    hits: list,
+    multi_crop_note: str | None = None,
+    total_override: int | None = None,
 ) -> tuple[list[dict], list[dict]]:
     vocab = _load_vocab()
     shown = hits[:MAX_PRODUCTS]
@@ -477,7 +482,7 @@ def _path_a_segments(
     shown = [shown[i] for i in order]
     doses = [doses[i] for i in order]
 
-    total = len(hits)
+    total = total_override if total_override is not None else len(hits)
     intro = f"Dạ, với {crop} bị {pest} ở {region_name}, em tìm được {total} sản phẩm còn phép dùng."
     if total > len(shown):
         intro += f" Gửi bác {len(shown)} sản phẩm tiêu biểu, bác hỏi thêm cán bộ khuyến nông xã để chọn loại có sẵn tại đại lý gần nhà:"
@@ -528,7 +533,346 @@ def _path_a_segments(
     return segments, products
 
 
-def answer(text: str, region: str, on_date: str) -> dict:
+def _tool_hit(product) -> db_module.ProductHit:
+    return db_module.ProductHit(
+        product_id=product.product_id,
+        trade_name=product.trade_name,
+        formulation=product.formulation,
+        active_ingredient=product.active_ingredient,
+        registrant=product.registrant,
+        status=product.status,
+        cite=product.cite,
+        source_url=product.source_url,
+    )
+
+
+def _tool_product_payload(product) -> dict:
+    return {
+        "trade_name": product.trade_name,
+        "formulation": product.formulation,
+        "active_ingredient": product.active_ingredient,
+        "cite": product.cite,
+        "registrant": product.registrant,
+    }
+
+
+def _tool_citation(product, *, source: str | None = None, url: str | None = None) -> dict:
+    return {
+        "type": "citation",
+        "source": source or product.cite,
+        "url": url if url is not None else product.source_url,
+    }
+
+
+def _date_vi(value) -> str:
+    return value.strftime("%d/%m/%Y") if value is not None else "không rõ"
+
+
+def _specific_dose_block(result) -> dict:
+    product = result.product
+    product_label = f"{product.trade_name} ({product.formulation})" if product.formulation else product.trade_name
+    if result.dose is None:
+        return {
+            "type": "dose_block",
+            "product": product_label,
+            "ai": product.active_ingredient,
+            "dose_text": _DOSE_TEXT,
+            "phi_days": None,
+            "note": _DOSE_NOTE,
+        }
+    parts = [result.dose.dose_text]
+    if result.dose.water_text:
+        parts.append(f"pha với {result.dose.water_text}")
+    if result.dose.method:
+        parts.append(result.dose.method)
+    return {
+        "type": "dose_block",
+        "product": product_label,
+        "ai": product.active_ingredient,
+        "dose_text": " — ".join(parts),
+        "phi_days": result.dose.phi_days,
+        "note": _DOSE_NOTE_VERIFIED,
+        "source_url": result.dose.source_url,
+    }
+
+
+def _tool_failure_response(region: str, crop: str | None, pest: str | None, reason: str) -> dict:
+    return {
+        "risk_class": "B",
+        "answer_segments": [
+            {
+                "type": "text",
+                "content": (
+                    "Dạ, em chưa lấy được kết quả xác thực từ cơ sở dữ liệu nên chưa thể kết luận hoặc "
+                    "đề xuất thuốc. Bác kiểm tra lại tên trên nhãn hoặc thử lại giúp em nhé."
+                ),
+            },
+            {"type": "abstain", "reason": reason, "handoff": True},
+        ],
+        "slots": {"crop": crop, "pest": pest, "region": region},
+        "products": [],
+    }
+
+
+def _render_registration_tool(result, region: str) -> dict:
+    slots = {"crop": result.crop, "pest": result.pest, "region": region}
+    product_name = f"{result.trade_name} {result.formulation or ''}".strip()
+    if result.resolution == "registered" and result.product is not None:
+        content = (
+            f"Dạ, có. {product_name} được đăng ký chính thức để phòng trừ {result.pest} trên "
+            f"{result.crop} trong danh mục còn hiệu lực. Em chỉ trả đúng sản phẩm bác vừa hỏi:"
+        )
+        return {
+            "risk_class": "A",
+            "answer_segments": [
+                {"type": "text", "content": content},
+                _specific_dose_block(result),
+                _tool_citation(result.product),
+            ],
+            "slots": slots,
+            "products": [_tool_product_payload(result.product)],
+        }
+
+    if result.resolution == "not_registered" and result.product is not None:
+        registered_pairs = ", ".join(
+            f"{use.crop} – {use.pest}" for use in result.registered_uses[:8]
+        )
+        suffix = f" Sản phẩm hiện có đăng ký cho: {registered_pairs}." if registered_pairs else ""
+        content = (
+            f"Dạ, không. Em không tìm thấy đăng ký chính thức của {product_name} cho {result.pest} "
+            f"trên {result.crop} trong danh mục hiện hành, nên sản phẩm này không được phép sử dụng "
+            f"cho cặp cây – dịch hại đó.{suffix} Em không thay câu hỏi này bằng "
+            "danh sách thuốc khác."
+        )
+        return {
+            "risk_class": "A",
+            "answer_segments": [
+                {"type": "text", "content": content},
+                _tool_citation(result.product),
+            ],
+            "slots": slots,
+            "products": [],
+        }
+
+    if result.resolution == "unavailable" and result.product is not None:
+        if result.legal_status == "transitional":
+            content = (
+                f"Dạ, {product_name} hiện còn được phép sử dụng đến hết ngày "
+                f"{_date_vi(result.effective_to)}, sau đó sẽ bị loại khỏi danh mục kể từ ngày "
+                f"{_date_vi(result.future_effective_from)}. Em không hướng dẫn liều cho sản phẩm đang chuyển tiếp này."
+            )
+            citation = _tool_citation(
+                result.product,
+                source=result.future_cite or result.product.cite,
+                url=result.future_source_url or result.product.source_url,
+            )
+        elif result.legal_status == "removed":
+            content = (
+                f"Dạ, {product_name} đã bị loại khỏi danh mục kể từ ngày "
+                f"{_date_vi(result.effective_from)}; bác không nên tiếp tục sử dụng."
+            )
+            citation = _tool_citation(result.product)
+        elif result.legal_status == "banned":
+            content = f"Dạ, {product_name} thuộc diện bị cấm sử dụng; em không thể hướng dẫn mua hoặc dùng."
+            citation = _tool_citation(result.product)
+        else:
+            return _tool_failure_response(region, result.crop, result.pest, result.reason_code)
+        return {
+            "risk_class": "A",
+            "answer_segments": [
+                {"type": "text", "content": content},
+                citation,
+                {"type": "abstain", "reason": result.reason_code, "handoff": True},
+            ],
+            "slots": slots,
+            "products": [],
+        }
+
+    if result.resolution == "ambiguous":
+        message = (
+            f"Em thấy tên {product_name} có nhiều quy cách hoặc định danh khác nhau. "
+            "Bác cho em đúng quy cách ghi trên nhãn để em không tra nhầm nhé."
+        )
+    else:
+        message = (
+            f"Em không tìm thấy chính xác sản phẩm {product_name} trong danh mục hiện hành. "
+            "Em sẽ không chuyển sang đề xuất thuốc khác; bác kiểm tra lại nhãn giúp em nhé."
+        )
+    return {
+        "risk_class": "B",
+        "answer_segments": [{"type": "text", "content": message}],
+        "slots": slots,
+        "products": [],
+    }
+
+
+def _render_status_tool(result, region: str, crop: str | None, pest: str | None) -> dict:
+    slots = {"crop": crop, "pest": pest, "region": region}
+    name = f"{result.trade_name} {result.formulation or ''}".strip()
+    if result.resolution != "found" or result.product is None:
+        return _tool_failure_response(region, crop, pest, result.reason_code)
+    if result.legal_status == "transitional":
+        content = (
+            f"Dạ, {name} hiện còn được phép sử dụng đến hết ngày {_date_vi(result.effective_to)}, "
+            f"sau đó sẽ bị loại khỏi danh mục kể từ ngày {_date_vi(result.future_effective_from)}."
+        )
+        citation = _tool_citation(
+            result.product,
+            source=result.future_cite or result.product.cite,
+            url=result.future_source_url or result.product.source_url,
+        )
+    elif result.legal_status == "removed":
+        content = f"Dạ, {name} đã bị loại khỏi danh mục kể từ ngày {_date_vi(result.effective_from)}."
+        citation = _tool_citation(result.product)
+    elif result.legal_status == "banned":
+        content = f"Dạ, {name} đã bị cấm sử dụng; em không thể hướng dẫn mua hoặc dùng."
+        citation = _tool_citation(result.product)
+    elif result.legal_status == "allowed":
+        content = f"Dạ, {name} hiện còn được phép sử dụng theo danh mục hiện hành."
+        citation = _tool_citation(result.product)
+    else:
+        return _tool_failure_response(region, crop, pest, result.reason_code)
+    segments = [{"type": "text", "content": content}, citation]
+    if result.legal_status in {"removed", "banned"}:
+        segments.append({"type": "abstain", "reason": result.reason_code, "handoff": True})
+    return {"risk_class": "A", "answer_segments": segments, "slots": slots, "products": []}
+
+
+def _render_registrant_tool(result, region: str, crop: str | None, pest: str | None) -> dict:
+    slots = {"crop": crop, "pest": pest, "region": region}
+    if result.resolution != "found" or result.product is None:
+        return _tool_failure_response(region, crop, pest, result.reason_code)
+    name = f"{result.trade_name} {result.formulation or ''}".strip()
+    if not result.registrant:
+        return _tool_failure_response(region, crop, pest, "registrant_missing")
+    return {
+        "risk_class": "A",
+        "answer_segments": [
+            {
+                "type": "text",
+                "content": f"Dạ, đơn vị đăng ký {name} là {result.registrant}.",
+            },
+            _tool_citation(result.product),
+        ],
+        "slots": slots,
+        # `products` represents recommendation cards and therefore stays empty
+        # for a registrant-only factual answer (no unrelated dose card).
+        "products": [],
+    }
+
+
+def _render_registry_tool(result, plan, region: str, crop: str | None, pest: str | None) -> dict:
+    from app.backend.schemas import (
+        ProductRegistrantResponse,
+        ProductRegistrationResponse,
+        ProductStatusResponse,
+        RegistrySearchResponse,
+    )
+
+    if isinstance(result, ProductRegistrationResponse):
+        return _render_registration_tool(result, region)
+    if isinstance(result, ProductStatusResponse):
+        return _render_status_tool(result, region, crop, pest)
+    if isinstance(result, ProductRegistrantResponse):
+        return _render_registrant_tool(result, region, crop, pest)
+    if isinstance(result, RegistrySearchResponse):
+        selected = set(plan.selected_product_ids)
+        products = [product for product in result.products if product.product_id in selected]
+        hits = [_tool_hit(product) for product in products]
+        segments, payloads = _path_a_segments(
+            REGION_NAMES.get(region, region),
+            result.crop,
+            result.pest,
+            hits,
+            total_override=result.total,
+        )
+        return {
+            "risk_class": "A",
+            "answer_segments": segments,
+            "slots": {"crop": result.crop, "pest": result.pest, "region": region},
+            "products": payloads,
+        }
+    return _tool_failure_response(region, crop, pest, "unsupported_tool_result")
+
+
+def _review_response(review, region: str) -> dict:
+    return {
+        "risk_class": "B",
+        "answer_segments": [{"type": "text", "content": review.message}],
+        "slots": {"crop": review.slots["crop"], "pest": review.slots["pest"], "region": region},
+        "products": [],
+    }
+
+
+def _confirmation_cancelled_response(region: str) -> dict:
+    return {
+        "risk_class": "B",
+        "answer_segments": [{
+            "type": "text",
+            "content": (
+                "Dạ, em đã bỏ lựa chọn vừa đoán. Bác đọc hoặc gõ lại đúng tên thuốc và quy cách trên nhãn "
+                "(ví dụ 250SC), hoặc gửi ảnh bao bì giúp em nhé; em sẽ không tự đoán tên thuốc khác."
+            ),
+        }],
+        "slots": {"crop": None, "pest": None, "region": region},
+        "products": [],
+    }
+
+
+def answer(
+    text: str,
+    region: str,
+    on_date: str,
+    session_id: str | None = None,
+    _skip_input_review: bool = False,
+    _resolved_payload: dict | None = None,
+) -> dict:
+    # Input-review layer runs before crop/pest extraction so phonetic fragments
+    # inside a product name ("a mít chưa", "ô đê") cannot steal those slots.
+    if not _skip_input_review:
+        from app.backend import clarifications, input_resolver
+
+        if session_id:
+            pending = clarifications.get(session_id)
+            if pending is not None:
+                intent = clarifications.confirmation_intent(text)
+                if intent == "yes":
+                    clarifications.clear(session_id)
+                    canonical = input_resolver.canonical_question(pending)
+                    if canonical is None:
+                        crop = (pending.get("crop") or {}).get("canonical")
+                        content = (
+                            f"Dạ, em xác nhận cây là {crop}. Bác mô tả rõ hơn dấu hiệu trên trái, lá hoặc cành "
+                            "(hoặc gửi ảnh) để em xác định đúng sâu bệnh; em chưa đưa thuốc khi mới có triệu chứng mơ hồ nhé."
+                            if crop
+                            else "Dạ, bác mô tả rõ hơn tên cây và dấu hiệu sâu bệnh giúp em nhé."
+                        )
+                        return {
+                            "risk_class": "B",
+                            "answer_segments": [{"type": "text", "content": content}],
+                            "slots": {"crop": crop, "pest": None, "region": region},
+                            "products": [],
+                        }
+                    return answer(
+                        canonical,
+                        region,
+                        on_date,
+                        session_id=session_id,
+                        _skip_input_review=True,
+                        _resolved_payload=pending,
+                    )
+                if intent == "no":
+                    clarifications.clear(session_id)
+                    return _confirmation_cancelled_response(region)
+                # A non yes/no message is treated as a corrected/new question.
+                clarifications.clear(session_id)
+
+        review = input_resolver.review_input(text)
+        if review is not None:
+            if session_id and review.action == "confirm":
+                clarifications.save(session_id, review.pending_payload())
+            return _review_response(review, region)
+
     conn = db_module.connect()
     try:
         vocab = _load_vocab()
@@ -577,7 +921,7 @@ def answer(text: str, region: str, on_date: str) -> dict:
                 "products": [],
             }
 
-        # --- P1-D: product/AI guard — chạy TRƯỚC path A (xem product_guard.py) ---
+        # --- Hard safety guards run before the LLM tool planner. ---
         # Thứ tự: (1) premise tăng/gấp đôi liều luôn chặn trước tiên (an toàn tuyệt
         # đối, không phụ thuộc có bắt được product hay không); (2)/(3)/(4) chỉ chặn
         # khi thực sự bắt được sản phẩm/hoạt chất có vấn đề — sản phẩm bình thường
@@ -592,29 +936,42 @@ def answer(text: str, region: str, on_date: str) -> dict:
                 segments = product_guard.banned_ai_segments(payload, conn)
                 return {"risk_class": "A", "answer_segments": segments, "slots": slots, "products": []}
 
-            trade_name, formulation = payload
-            result = product_guard.evaluate_product(conn, trade_name, formulation, on_date, crop)
-            if result.kind in ("removed", "transitional"):
-                alt_hits = db_module.lookup_products(conn, crop, pest, on_date) if crop and pest else []
-                segments = product_guard.removed_or_transitional_segments(result, crop, pest, alt_hits)
-                return {"risk_class": "A", "answer_segments": segments, "slots": slots, "products": []}
-            if result.kind == "banned":
-                segments = product_guard.banned_ai_segments(result.current_row["active_ingredient"], conn)
-                return {"risk_class": "A", "answer_segments": segments, "slots": slots, "products": []}
-            if result.kind == "wrong_crop":
-                alt_hits = db_module.lookup_products(conn, crop, pest, on_date) if crop and pest else []
-                segments = product_guard.wrong_crop_segments(result, crop, pest, alt_hits)
-                return {"risk_class": "A", "answer_segments": segments, "slots": slots, "products": []}
-            # result.kind in ("ok", "unknown") -> sản phẩm bình thường, đi tiếp path A/mock
+        # LLM tool orchestration: model chooses only a zero-argument tool name;
+        # Python injects all canonical arguments and executes parameterized DB
+        # queries. A product-specific query can never call the generic list tool.
+        from app.backend import registry_agent
+
+        resolved_product = None
+        resolved_formulation = None
+        if _resolved_payload and _resolved_payload.get("product"):
+            resolved_product = _resolved_payload["product"].get("canonical")
+            resolved_formulation = _resolved_payload["product"].get("formulation")
+        elif mention is not None and mention[0] == "product":
+            resolved_product, resolved_formulation = mention[1]
+
+        query = registry_agent.ResolvedQuery(
+            original_text=(
+                (_resolved_payload or {}).get("original_text") or text
+            ),
+            product=resolved_product,
+            formulation=resolved_formulation,
+            crop=crop,
+            pest=pest,
+            region=region,
+            on_date=on_date,
+        )
+        decision = registry_agent.choose_tool(query)
+        if decision is not None:
+            try:
+                tool_result = registry_agent.execute_tool(decision, query, conn=conn)
+                answer_plan = registry_agent.synthesize_plan(tool_result)
+                return _render_registry_tool(tool_result, answer_plan, region, crop, pest)
+            except Exception:
+                return _tool_failure_response(region, crop, pest, "registry_tool_execution_failed")
 
         multi_crop_note = None
         if crop and len(crop_seen) > 1:
             multi_crop_note = f"Bác nhắc tới cả {' và '.join(crop_seen)}, em trả lời cho {crop} trước nhé. "
-
-        if crop and pest:
-            hits = db_module.lookup_products(conn, crop, pest, on_date)
-            segments, products = _path_a_segments(region_name, crop, pest, hits, multi_crop_note)
-            return {"risk_class": "A", "answer_segments": segments, "slots": slots, "products": products}
 
         # --- P1-G: minh bạch phạm vi khi crop ngoài KB (chỉ khi KHÔNG có pest slot —
         # có pest thì để path A ở trên xử lý, registry.db độc lập với phạm vi KB) ---

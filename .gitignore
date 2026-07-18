@@ -28,6 +28,9 @@ data/*
 #Codex
 .codex/
 
+# Local runtime logs
+.run/
+
 #pytest_cache
 pytest_cache/
 

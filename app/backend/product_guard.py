@@ -161,8 +161,8 @@ def find_product_or_ai_mention(text: str):
 def _product_rows(conn: sqlite3.Connection, trade_name: str, formulation: str | None):
     q = (
         "SELECT p.id AS product_id, p.trade_name, p.formulation, p.status,"
-        " p.effective_from, p.effective_to, ai.name_common AS active_ingredient,"
-        " d.so_hieu"
+        " p.registrant, p.effective_from, p.effective_to,"
+        " ai.name_common AS active_ingredient, d.so_hieu, d.url AS source_url"
         " FROM products p"
         " JOIN active_ingredients ai ON ai.id = p.ai_id"
         " JOIN docs d ON d.id = p.doc_id"

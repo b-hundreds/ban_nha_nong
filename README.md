@@ -20,8 +20,9 @@ Tính năng chính (đã chạy):
 - **Voice**: nhận giọng nói qua Google Cloud STT v2 (Chirp 3, ưu tiên) hoặc OpenAI
   whisper (fallback); không có key vẫn gõ chữ được.
 - **Lịch sử hội thoại lưu server-side** (SQLite `data/history.db`), UI chat có sidebar.
-- **Bộ eval hallucination** (`eval/`): 50 câu (bẫy thuốc cấm/bị loại/tăng liều/sai cây...)
-  chấm tự động — tiêu chí cao nhất của dự án.
+- **Bộ eval hallucination** (`eval/`): bộ v0 50 câu + bộ v1 dùng SQLite làm oracle
+  và red-team RAG (thuốc/cây/bệnh/liều/PHI/citation/prompt injection...) — không chỉ
+  kiểm tra schema mà đối chiếu từng claim có cấu trúc với nguồn thật.
 
 ## Cài đặt
 
@@ -83,14 +84,19 @@ cache-first) rồi hard-refresh (Ctrl+Shift+R).
 ```bash
 .venv/bin/pytest -q                             # toàn bộ unit/integration tests
 .venv/bin/python3 eval/run_eval.py --tag local  # bộ eval 50 câu (đường B tốn ~10-16 call Gemini)
+.venv/bin/python eval/run_hallucination.py --tag local          # audit v1 offline, không gọi model thật
+.venv/bin/python eval/run_hallucination.py --tag release --strict # gate release, known gap cũng làm fail
 ```
 
 Quy tắc: **pytest phải xanh trước mọi commit.** Eval exit code 1 nếu có câu high-risk fail.
+Chi tiết ma trận và cách thêm case: [docs/hallucination-testing.md](docs/hallucination-testing.md).
 
 ## Cấu trúc
 
-- `app/backend/` — FastAPI (`api.py`), pipeline (`pipeline.py`: small-talk → slot →
-  product guard → path A tra danh mục / path B RAG), RAG (`retrieval.py`, `generate.py`),
+- `app/backend/` — FastAPI (`api.py`), input review + xác nhận sai chính tả/phiên âm
+  (`input_resolver.py`, `clarifications.py`), LLM tool planner + API/service truy vấn DB
+  (`registry_agent.py`, `registry_api.py`, `registry_service.py`), pipeline (`pipeline.py`:
+  safety guard → tool DB / path B RAG), RAG (`retrieval.py`, `generate.py`),
   validator chống bịa số (`validators.py`), lịch sử (`history.py`), ASR (`asr.py`),
   query API registry (`db.py`).
 - `app/web/` — PWA chat tĩnh (không build step, không CDN).

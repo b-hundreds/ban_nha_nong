@@ -5,6 +5,7 @@ Chạy demo: `uvicorn app.backend.api:app --reload` rồi mở http://localhost:
 from __future__ import annotations
 
 import json
+import logging
 import os
 import sqlite3
 from datetime import date, datetime, timezone
@@ -15,7 +16,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.staticfiles import StaticFiles
 
-from app.backend import asr, history, pipeline
+from app.backend import asr, history, pipeline, registry_api
 from app.backend.schemas import (
     AskRequest,
     AskResponse,
@@ -33,8 +34,11 @@ HANDOFF_DB = BASE_DIR / "data" / "handoff.db"
 TRANSCRIBE_UNAVAILABLE_MSG = "Dạ hiện em chưa nhận diện được giọng nói, bác gõ chữ giúp em nhé."
 TRANSCRIBE_FAILED_MSG = "Dạ em nhận diện giọng nói bị lỗi, bác thử lại hoặc gõ chữ giúp em nhé."
 
+logger = logging.getLogger(__name__)
+
 app = FastAPI(title="Trợ lý nông nghiệp — API v0")
 app.include_router(history.router)
+app.include_router(registry_api.router)
 
 
 def _handoff_conn() -> sqlite3.Connection:
@@ -56,7 +60,7 @@ def _handoff_conn() -> sqlite3.Connection:
 
 @app.post("/api/ask", response_model=AskResponse)
 def ask(req: AskRequest) -> AskResponse:
-    result = pipeline.answer(req.text, req.region, date.today().isoformat())
+    result = pipeline.answer(req.text, req.region, date.today().isoformat(), session_id=req.session_id)
     return AskResponse(**result)
 
 
@@ -70,6 +74,7 @@ async def transcribe(audio: UploadFile = File(...)) -> TranscribeResponse:
         try:
             text = await asr.transcribe_google(audio_bytes)
         except Exception:
+            logger.exception("Google Speech-to-Text transcription failed")
             raise HTTPException(status_code=502, detail=TRANSCRIBE_FAILED_MSG)
         return TranscribeResponse(text=text)
 

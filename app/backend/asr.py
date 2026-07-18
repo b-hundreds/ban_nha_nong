@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from urllib.parse import urlparse
 
 from google.api_core.client_options import ClientOptions
 from google.api_core.exceptions import GoogleAPICallError
@@ -26,6 +27,13 @@ from google.cloud.speech_v2.types import cloud_speech
 
 DEFAULT_GOOGLE_STT_LOCATION = "eu"
 GOOGLE_STT_MODEL = "chirp_3"
+
+_PROXY_ENV_KEYS = (
+    "GRPC_PROXY", "grpc_proxy", "HTTPS_PROXY", "https_proxy",
+    "HTTP_PROXY", "http_proxy", "ALL_PROXY", "all_proxy",
+)
+_TRUE_VALUES = frozenset({"1", "true", "yes", "on"})
+_FALSE_VALUES = frozenset({"0", "false", "no", "off"})
 
 
 def google_credentials_available() -> bool:
@@ -45,7 +53,56 @@ def _google_stt_location() -> str:
     return os.getenv("GOOGLE_STT_LOCATION", DEFAULT_GOOGLE_STT_LOCATION)
 
 
+def _is_local_discard_proxy(value: str | None) -> bool:
+    """Nhận proxy loopback port 9 thường dùng để cố ý chặn outbound network."""
+    if not value:
+        return False
+    raw = value.strip()
+    if "://" not in raw:
+        raw = f"http://{raw}"
+    try:
+        parsed = urlparse(raw)
+        return parsed.hostname in {"127.0.0.1", "localhost", "::1"} and parsed.port == 9
+    except ValueError:
+        return False
+
+
+def _configure_google_proxy_bypass() -> bool:
+    """Cho Google STT đi thẳng khi process bị gắn một proxy chặn giả.
+
+    Một số môi trường chạy local/sandbox đặt ``HTTP(S)_PROXY=127.0.0.1:9``.
+    Cả OAuth token refresh và gRPC Speech đều kế thừa proxy này, khiến mọi clip
+    hợp lệ trả 502 trước khi tới Google.  Thêm ``.googleapis.com`` vào NO_PROXY
+    xử lý được cả hai transport mà không xoá proxy toàn process.
+
+    ``GOOGLE_STT_BYPASS_PROXY``:
+    - ``auto`` (mặc định): chỉ bypass proxy loopback port 9 đã biết là không dùng được;
+    - true/1/on: luôn bypass proxy cho Google APIs;
+    - false/0/off: giữ nguyên cấu hình proxy của môi trường.
+    """
+    mode = os.getenv("GOOGLE_STT_BYPASS_PROXY", "auto").strip().casefold()
+    if mode in _FALSE_VALUES:
+        return False
+    should_bypass = mode in _TRUE_VALUES
+    if mode == "auto" or (mode not in _TRUE_VALUES and mode not in _FALSE_VALUES):
+        should_bypass = any(_is_local_discard_proxy(os.getenv(key)) for key in _PROXY_ENV_KEYS)
+    if not should_bypass:
+        return False
+
+    existing = os.getenv("NO_PROXY") or os.getenv("no_proxy") or ""
+    entries = [entry.strip() for entry in existing.split(",") if entry.strip()]
+    if not any(entry.casefold() in {"googleapis.com", ".googleapis.com"} for entry in entries):
+        entries.append(".googleapis.com")
+    value = ",".join(entries)
+    # requests/google-auth thường đọc lowercase/uppercase theo platform; gRPC
+    # Core cũng hỗ trợ no_proxy. Ghi cả hai để hành vi nhất quán trên Windows.
+    os.environ["NO_PROXY"] = value
+    os.environ["no_proxy"] = value
+    return True
+
+
 def _build_client(location: str) -> SpeechAsyncClient:
+    _configure_google_proxy_bypass()
     client_options = None
     if location != "global":
         client_options = ClientOptions(api_endpoint=f"{location}-speech.googleapis.com")

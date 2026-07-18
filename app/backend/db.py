@@ -15,6 +15,7 @@ class ProductHit:
     registrant: str | None
     status: str
     cite: str
+    source_url: str = ""
 
 
 @dataclass
@@ -39,7 +40,8 @@ def _cite(row) -> str:
 
 
 _BASE = """SELECT p.id AS product_id, p.trade_name, p.formulation, p.registrant, p.status,
-                  ai.name_common AS active_ingredient, d.so_hieu, p.effective_from
+                  ai.name_common AS active_ingredient, d.so_hieu, d.url AS source_url,
+                  p.effective_from, p.effective_to
            FROM products p
            JOIN active_ingredients ai ON ai.id = p.ai_id
            JOIN docs d ON d.id = p.doc_id"""
@@ -48,8 +50,16 @@ _DATE = " p.effective_from <= :d AND (p.effective_to IS NULL OR p.effective_to >
 
 
 def _hit(row) -> ProductHit:
-    return ProductHit(row["product_id"], row["trade_name"], row["formulation"],
-                      row["active_ingredient"], row["registrant"], row["status"], _cite(row))
+    return ProductHit(
+        product_id=row["product_id"],
+        trade_name=row["trade_name"],
+        formulation=row["formulation"],
+        active_ingredient=row["active_ingredient"],
+        registrant=row["registrant"],
+        status=row["status"],
+        cite=_cite(row),
+        source_url=row["source_url"],
+    )
 
 
 def lookup_products(conn, crop: str, pest: str, on_date: str) -> list[ProductHit]:
@@ -60,6 +70,53 @@ def lookup_products(conn, crop: str, pest: str, on_date: str) -> list[ProductHit
                 " ORDER BY p.trade_name",
         {"crop": _norm(crop), "pest": _norm(pest), "d": on_date}).fetchall()
     return [_hit(r) for r in rows]
+
+
+def lookup_exact_products(
+    conn: sqlite3.Connection,
+    trade_name: str,
+    formulation: str | None,
+    on_date: str,
+) -> list[ProductHit]:
+    """Return current exact product identities; never fuzzy-match tool arguments."""
+    conn.row_factory = sqlite3.Row
+    query = _BASE + " WHERE p.trade_name = :trade COLLATE NOCASE AND" + _DATE
+    params = {"trade": trade_name.strip(), "d": on_date}
+    if formulation is not None:
+        query += " AND ifnull(p.formulation, '') = :formulation COLLATE NOCASE"
+        params["formulation"] = formulation.strip()
+    query += " ORDER BY p.trade_name, p.formulation, p.effective_from DESC"
+    return [_hit(row) for row in conn.execute(query, params).fetchall()]
+
+
+def get_product_hit(conn: sqlite3.Connection, product_id: int) -> ProductHit | None:
+    conn.row_factory = sqlite3.Row
+    row = conn.execute(_BASE + " WHERE p.id = ? LIMIT 1", (product_id,)).fetchone()
+    return _hit(row) if row is not None else None
+
+
+def product_has_registered_use(
+    conn: sqlite3.Connection,
+    product_id: int,
+    crop: str,
+    pest: str,
+) -> bool:
+    row = conn.execute(
+        """SELECT 1 FROM uses
+           WHERE product_id=? AND crop=? COLLATE NOCASE AND pest=? COLLATE NOCASE
+           LIMIT 1""",
+        (product_id, _norm(crop), _norm(pest)),
+    ).fetchone()
+    return row is not None
+
+
+def list_product_uses(conn: sqlite3.Connection, product_id: int) -> list[tuple[str, str]]:
+    rows = conn.execute(
+        """SELECT DISTINCT crop, pest FROM uses
+           WHERE product_id=? ORDER BY crop, pest""",
+        (product_id,),
+    ).fetchall()
+    return [(row["crop"], row["pest"]) for row in rows]
 
 
 def check_product_status(conn, name: str, on_date: str) -> ProductHit | None:

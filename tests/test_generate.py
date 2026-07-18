@@ -147,6 +147,147 @@ def test_generate_b_answer_citation_sai_chunk_nguon_bi_loai():
     assert result["grounded"] is False
 
 
+def test_regression_rag_fake_url_phai_fail_closed():
+    """Một quote có thật không làm URL do model tự khai trở thành đáng tin.
+
+    URL citation phải khớp URL của đúng chunk; URL ngoài evidence là payload giả
+    mạo và toàn bộ câu trả lời phải fail-closed.
+    """
+    quote = "Xuống giống từ 01-30/11/2026, phù hợp dự báo nguồn nước và thời tiết."
+    payload = _payload(
+        text="Bác nên xuống giống theo đúng khung lịch được khuyến cáo cho đợt này.",
+        citations=[
+            {
+                "doc_id": "lich-thoi-vu-an-giang-dx-2026",
+                "section": "Đợt 1",
+                "url": "https://attacker.example/fake",
+                "quote": quote,
+            }
+        ],
+        grounded=True,
+    )
+
+    result = generate.generate_b_answer(
+        "tháng 11 tôi cần làm gì cho ruộng lúa",
+        CHUNKS,
+        region="an_giang",
+        client=_FakeClient([payload]),
+    )
+
+    assert result["grounded"] is False
+    assert result["citations"] == []
+
+
+def test_regression_rag_fake_section_cung_doc_id_phai_fail_closed():
+    """Không được fallback từ section bịa sang một chunk khác cùng doc_id."""
+    quote = "Xuống giống từ 01-30/11/2026, phù hợp dự báo nguồn nước và thời tiết."
+    payload = _payload(
+        text="Bác nên xuống giống theo đúng khung lịch được khuyến cáo cho đợt này.",
+        citations=[
+            {
+                "doc_id": "lich-thoi-vu-an-giang-dx-2026",
+                "section": "Mục không tồn tại",
+                "url": "https://x/dot1",
+                "quote": quote,
+            }
+        ],
+        grounded=True,
+    )
+
+    result = generate.generate_b_answer(
+        "tháng 11 tôi cần làm gì cho ruộng lúa",
+        CHUNKS,
+        region="an_giang",
+        client=_FakeClient([payload]),
+    )
+
+    assert result["grounded"] is False
+    assert result["citations"] == []
+
+
+def test_regression_rag_number_from_uncited_chunk_phai_fail_closed():
+    """Số có trong top-k nhưng không có trong chunk được cite vẫn là unsupported."""
+    chunks = [
+        {
+            "id": 10,
+            "doc_id": "doc-lua",
+            "section": "Tưới nước",
+            "text": "Giữ mực nước ruộng từ 3-5 cm trong giai đoạn đẻ nhánh.",
+            "crop": "lúa",
+            "region_scope": "national",
+            "url": "https://gov.example/lua",
+        },
+        {
+            "id": 11,
+            "doc_id": "doc-lua",
+            "section": "Bón phân",
+            "text": "Bón 40 kg/ha kali theo kết quả phân tích đất.",
+            "crop": "lúa",
+            "region_scope": "national",
+            "url": "https://gov.example/lua",
+        },
+    ]
+    payload = _payload(
+        text="Bác bón 40 kg/ha kali.",
+        citations=[
+            {
+                "doc_id": "doc-lua",
+                "section": "Tưới nước",
+                "url": "https://gov.example/lua",
+                "quote": chunks[0]["text"],
+            }
+        ],
+        grounded=True,
+    )
+
+    result = generate.generate_b_answer(
+        "Bón kali cho lúa thế nào?",
+        chunks,
+        region="an_giang",
+        user_crop="lúa",
+        client=_FakeClient([payload]),
+    )
+
+    assert result["grounded"] is False
+
+
+def test_regression_rag_qualitative_claim_irrelevant_quote_phai_fail_closed():
+    """Quote hợp lệ về tưới nước không chứng minh một khuyến nghị phun thuốc."""
+    chunks = [
+        {
+            "id": 12,
+            "doc_id": "doc-lua",
+            "section": "Tưới nước",
+            "text": "Giữ mực nước ruộng từ 3-5 cm trong giai đoạn đẻ nhánh.",
+            "crop": "lúa",
+            "region_scope": "national",
+            "url": "https://gov.example/lua",
+        }
+    ]
+    payload = _payload(
+        text="Phun thuốc vào ban đêm chắc chắn chữa khỏi bệnh.",
+        citations=[
+            {
+                "doc_id": "doc-lua",
+                "section": "Tưới nước",
+                "url": "https://gov.example/lua",
+                "quote": chunks[0]["text"],
+            }
+        ],
+        grounded=True,
+    )
+
+    result = generate.generate_b_answer(
+        "Nên phun thuốc lúc nào?",
+        chunks,
+        region="an_giang",
+        user_crop="lúa",
+        client=_FakeClient([payload]),
+    )
+
+    assert result["grounded"] is False
+
+
 def test_generate_b_answer_model_tu_nhan_khong_du_can_cu():
     payload = _payload(text="Em chưa đủ căn cứ để trả lời câu này.", citations=[], grounded=False)
     client = _FakeClient([payload])

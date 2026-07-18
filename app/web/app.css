@@ -697,6 +697,25 @@ svg {
 .citation-link span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .citation-link svg { width: 14px; height: 14px; flex: none; }
 
+.answer-actions { display: flex; margin-top: 12px; }
+.answer-speech-btn {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: white;
+  padding: 7px 10px;
+  color: var(--text-soft);
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+.answer-speech-btn:hover { border-color: var(--border-strong); background: var(--sidebar); color: var(--text); }
+.answer-speech-btn.is-speaking { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.answer-speech-btn svg { width: 16px; height: 16px; flex: none; }
+
 .handoff-panel {
   margin-top: 14px;
   padding: 13px 14px;
@@ -763,8 +782,9 @@ svg {
 
 .composer textarea::placeholder { color: #8c918c; }
 .composer-actions { display: flex; flex: none; align-items: center; gap: 3px; }
-.composer-icon-btn { width: 38px; height: 38px; color: var(--text-soft); }
+.composer-icon-btn { width: 38px; height: 38px; color: var(--text-soft); touch-action: manipulation; }
 .composer-icon-btn.is-recording { background: var(--danger-soft); color: var(--danger); }
+.composer-icon-btn.is-requesting { color: var(--accent); }
 .mic-recording { display: none; }
 .composer-icon-btn.is-recording .mic-default { display: none; }
 .composer-icon-btn.is-recording .mic-recording { display: block; }

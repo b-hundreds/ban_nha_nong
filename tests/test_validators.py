@@ -1,6 +1,7 @@
 """Test cho app/backend/validators.py (P1-A) — TDD, ca tiếng Việt thật."""
 from app.backend.validators import (
     NumberMention,
+    check_claim_support,
     check_numbers,
     check_quote,
     extract_numbers,
@@ -55,6 +56,63 @@ def test_check_quote_fail_unrelated_text():
 def test_check_quote_empty_evidence_list():
     res = check_quote("bất kỳ câu nào", [])
     assert res.ok is False
+
+
+# --------------------------------------------------------------------------
+# check_claim_support
+# --------------------------------------------------------------------------
+
+def test_check_claim_support_accepts_conservative_paraphrase():
+    result = check_claim_support(
+        "Bác nên xuống giống theo đúng khung lịch được khuyến cáo cho đợt này.",
+        ["Xuống giống từ đầu tháng, phù hợp dự báo nguồn nước và thời tiết."],
+    )
+    assert result.ok is True
+    assert result.failures == []
+
+
+def test_check_claim_support_rejects_irrelevant_quote():
+    result = check_claim_support(
+        "Phun thuốc vào ban đêm chắc chắn chữa khỏi bệnh.",
+        ["Giữ mực nước ruộng trong giai đoạn đẻ nhánh."],
+    )
+    assert result.ok is False
+    assert result.failures[0].reason in {"insufficient_overlap", "unsupported_action"}
+
+
+def test_check_claim_support_checks_every_sentence_independently():
+    result = check_claim_support(
+        "Giữ mực nước ruộng trong giai đoạn đẻ nhánh. Phun thuốc vào ban đêm.",
+        ["Giữ mực nước ruộng trong giai đoạn đẻ nhánh."],
+    )
+    assert result.ok is False
+    assert [failure.claim for failure in result.failures] == ["Phun thuốc vào ban đêm."]
+
+
+def test_check_claim_support_rejects_stronger_conclusion_added_to_real_quote():
+    result = check_claim_support(
+        "Giữ mực nước ruộng trong giai đoạn đẻ nhánh chắc chắn chữa khỏi bệnh.",
+        ["Giữ mực nước ruộng trong giai đoạn đẻ nhánh."],
+    )
+    assert result.ok is False
+    assert result.failures[0].reason == "unsupported_strength"
+
+
+def test_check_claim_support_does_not_union_unrelated_quotes():
+    result = check_claim_support(
+        "Bón kali giúp đất phù sa màu mỡ.",
+        ["Bón kali theo phân tích.", "Đất phù sa phù hợp canh tác."],
+    )
+    assert result.ok is False
+
+
+def test_check_claim_support_rejects_negation_not_present_in_quote():
+    result = check_claim_support(
+        "Không phun thuốc vào buổi sáng.",
+        ["Phun thuốc vào buổi sáng."],
+    )
+    assert result.ok is False
+    assert result.failures[0].reason == "unsupported_negation"
 
 
 # --------------------------------------------------------------------------

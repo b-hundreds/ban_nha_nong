@@ -1,15 +1,18 @@
 """Validator chain — lớp chặn an toàn sau sinh (spec §6.5).
 
-Thuần Python, KHÔNG gọi LLM/API nào. Ba mảnh chính:
+Thuần Python, KHÔNG gọi LLM/API nào. Bốn mảnh chính:
 
 1. ``check_quote``   — passage được cite (Citations API) có thực sự nằm
    trong evidence không (exact, rồi fallback fuzzy).
-2. ``extract_numbers`` / ``check_numbers`` — mọi con số (liều, PHI, %...)
+2. ``check_claim_support`` — mỗi câu/claim định tính phải có đủ từ neo nội
+   dung và hành động trong ít nhất một quote đã được xác thực; các phủ định
+   hoặc khẳng định tuyệt đối không có trong quote bị chặn fail-closed.
+3. ``extract_numbers`` / ``check_numbers`` — mọi con số (liều, PHI, %...)
    xuất hiện trong câu trả lời phải truy được về evidence hoặc về khối
    dose_block render từ DB (kiến trúc: "con số không bao giờ do LLM sinh
    ra" — validator này là lưới an toàn bắt trường hợp LLM lỡ bịa/đổi số
    khi viết phần diễn giải quanh khối số).
-3. ``validate_answer`` — điều phối 2 lớp trên theo cấu trúc answer_segments
+4. ``validate_answer`` — điều phối các lớp trên theo cấu trúc answer_segments
    (xem app/backend/schemas.py) và trả về verdict + đề xuất hành động.
 
 Cố ý KHÔNG import từ ingest/normalize.py (nơi có parse_viet_number,
@@ -34,6 +37,7 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from math import ceil
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
@@ -105,7 +109,207 @@ def check_quote(quote: str, evidence: list[str]) -> QuoteCheckResult:
 
 
 # --------------------------------------------------------------------------
-# 2. Number extraction + check
+# 2. Claim-to-citation relevance check
+# --------------------------------------------------------------------------
+
+# Tách theo ranh giới câu/ý, nhưng chỉ coi dấu chấm là ranh giới khi sau nó có
+# khoảng trắng để không cắt số thập phân hay mã tài liệu. Mỗi phần được kiểm tra
+# độc lập: một câu có căn cứ không được phép che cho câu bịa nằm cạnh nó.
+_CLAIM_SPLIT_RE = re.compile(r"(?:\r?\n)+|(?<=[.!?;])\s+")
+_SUPPORT_WORD_RE = re.compile(r"[^\W\d_]+", re.UNICODE)
+
+# Chỉ bỏ từ hội thoại/cấu trúc không mang nội dung kiểm chứng. Danh từ domain như
+# "thuốc", "bệnh", "nước", "lúa" cố ý được giữ lại để một citation khác chủ đề
+# không thể đạt ngưỡng chỉ nhờ vài từ chung chung.
+_SUPPORT_STOPWORDS = frozenset(
+    {
+        "ạ", "ai", "ấy", "bác", "bạn", "các", "cần", "cho", "chứ", "của",
+        "dạ", "đây", "để", "đó", "được", "đúng", "em", "gì", "hãy", "khi",
+        "khung", "khuyến", "cáo", "là", "lúc", "mà", "một", "nào", "này",
+        "nên", "nhé", "những", "ở", "phải", "quá", "quy", "rồi", "thế",
+        "theo", "thì", "trước", "từ", "và", "vào", "về", "việc", "với", "vừa",
+    }
+)
+
+# Các nhóm hành động/kết quả có rủi ro trong tư vấn nông nghiệp. Nếu claim dùng
+# một nhóm, quote khớp phải có ít nhất một từ cùng nhóm; token overlap đơn thuần
+# (vd cùng nhắc "lúa/bệnh") không đủ để biến hướng dẫn tưới thành hướng dẫn phun.
+_SUPPORT_ACTION_GROUPS = (
+    frozenset({"phun", "xịt"}),
+    frozenset({"bón", "rải"}),
+    frozenset({"tưới", "giữ", "duytrì"}),
+    frozenset({"pha", "trộn"}),
+    frozenset({"gieo", "xuống", "sạ"}),
+    frozenset({"cắt", "tỉa"}),
+    frozenset({"ngâm"}),
+    frozenset({"tăng"}),
+    frozenset({"giảm"}),
+    frozenset({"thuhoạch"}),
+    frozenset({"trị", "chữa", "diệt", "phòng", "trừ"}),
+)
+
+# Những cụm này làm mạnh kết luận. Chỉ cho phép khi chính quote cũng có cụm đó;
+# nếu không, model đã nâng độ chắc chắn vượt quá bằng chứng dù chủ đề vẫn giống.
+_SUPPORT_STRENGTH_PHRASES = (
+    "chac chan",
+    "chua khoi",
+    "dam bao",
+    "bao dam",
+    "an toan tuyet doi",
+    "hoan toan an toan",
+    "hoan toan vo hai",
+    "tuyet doi khong",
+    "triet de",
+    "mot tram phan tram",
+)
+_SUPPORT_NEGATION_TOKENS = frozenset({"không", "chưa", "cấm", "tránh"})
+
+
+def _fold_support_text(text: str) -> str:
+    """Lowercase và bỏ dấu để so các cụm tăng cường/xâu nguyên văn.
+
+    Đây chỉ là bước tìm liên quan sau khi quote nguyên văn đã được kiểm tra bởi
+    ``check_quote``; bỏ dấu ở đây không làm citation giả trở thành hợp lệ.
+    """
+    folded = unicodedata.normalize("NFD", text.casefold()).replace("đ", "d")
+    return "".join(ch for ch in folded if unicodedata.category(ch) != "Mn")
+
+
+def _support_tokens(text: str) -> tuple[str, ...]:
+    # Token nội dung giữ nguyên dấu để không đánh đồng các cặp có ý nghĩa khác
+    # nhau sau khi fold, ví dụ "chữa/chưa", "dùng/đúng", "sâu/sau".
+    normalized = unicodedata.normalize("NFC", text.casefold())
+    # Ghép một số động từ hai âm tiết trước khi tokenize để tránh việc chỉ khớp
+    # một nửa cụm quá chung như "duy" hoặc "thu".
+    normalized = re.sub(r"\bduy\s+trì\b", "duytrì", normalized)
+    normalized = re.sub(r"\bthu\s+hoạch\b", "thuhoạch", normalized)
+    return tuple(
+        token
+        for token in _SUPPORT_WORD_RE.findall(normalized)
+        if len(token) > 1 and token not in _SUPPORT_STOPWORDS
+    )
+
+
+@dataclass
+class ClaimSupportFailure:
+    claim: str
+    reason: Literal[
+        "empty_answer",
+        "no_cited_quote",
+        "no_substantive_claim",
+        "insufficient_overlap",
+        "unsupported_action",
+        "unsupported_strength",
+        "unsupported_negation",
+    ]
+    matched_evidence_idx: int | None
+    overlap_tokens: tuple[str, ...] = ()
+    required_overlap: int = 0
+
+
+@dataclass
+class ClaimSupportResult:
+    ok: bool
+    failures: list[ClaimSupportFailure] = field(default_factory=list)
+
+
+def _claim_pair_supported(
+    claim: str,
+    claim_tokens: set[str],
+    quote: str,
+) -> tuple[bool, str, tuple[str, ...], int]:
+    quote_tokens = set(_support_tokens(quote))
+    overlap = tuple(sorted(claim_tokens & quote_tokens))
+    required = 1 if len(claim_tokens) == 1 else max(2, ceil(len(claim_tokens) * 0.4))
+
+    claim_folded = " ".join(_fold_support_text(claim).split())
+    quote_folded = " ".join(_fold_support_text(quote).split())
+    # Exact claim nằm trong quote là bằng chứng mạnh nhất. Vẫn kiểm strength và
+    # phủ định bên dưới để giữ một đường code/policy duy nhất.
+    overlap_ok = bool(claim_folded and claim_folded in quote_folded) or len(overlap) >= required
+    if not overlap_ok:
+        return False, "insufficient_overlap", overlap, required
+
+    for phrase in _SUPPORT_STRENGTH_PHRASES:
+        if phrase in claim_folded and phrase not in quote_folded:
+            return False, "unsupported_strength", overlap, required
+
+    claim_negation = claim_tokens & _SUPPORT_NEGATION_TOKENS
+    if claim_negation and not (quote_tokens & _SUPPORT_NEGATION_TOKENS):
+        return False, "unsupported_negation", overlap, required
+
+    for action_group in _SUPPORT_ACTION_GROUPS:
+        if claim_tokens & action_group and not quote_tokens & action_group:
+            return False, "unsupported_action", overlap, required
+
+    return True, "", overlap, required
+
+
+def check_claim_support(answer_text: str, cited_quotes: list[str]) -> ClaimSupportResult:
+    """Kiểm tra từng claim định tính với từng quote citation đã xác thực.
+
+    Đây là relevance/faithfulness gate quyết định, không phải một LLM judge và
+    không tuyên bố giải được entailment ngôn ngữ tự do. Chính sách cố ý bảo thủ:
+
+    * mỗi câu/ý có nội dung phải được MỘT quote riêng hỗ trợ; không gộp token từ
+      nhiều nguồn để tạo ra một bằng chứng tổng hợp không tồn tại;
+    * cần ít nhất 40% token nội dung (tối thiểu 2, hoặc 1 với claim một token);
+    * hành động, phủ định và khẳng định tuyệt đối phải có neo tương ứng trong
+      chính quote đó.
+
+    False negative sẽ làm đường B abstain, an toàn hơn việc hiển thị một khuyến
+    nghị nông nghiệp không thể truy ngược về nguồn.
+    """
+    if not answer_text or not answer_text.strip():
+        return ClaimSupportResult(
+            ok=False,
+            failures=[ClaimSupportFailure("", "empty_answer", None)],
+        )
+    quotes = [quote for quote in cited_quotes if quote and quote.strip()]
+    if not quotes:
+        return ClaimSupportResult(
+            ok=False,
+            failures=[ClaimSupportFailure(answer_text, "no_cited_quote", None)],
+        )
+
+    claims = [part.strip() for part in _CLAIM_SPLIT_RE.split(answer_text) if part.strip()]
+    substantive = 0
+    failures: list[ClaimSupportFailure] = []
+    for claim in claims:
+        claim_tokens = set(_support_tokens(claim))
+        if not claim_tokens:
+            continue
+        substantive += 1
+        best_idx: int | None = None
+        best_overlap: tuple[str, ...] = ()
+        best_required = 0
+        best_reason = "insufficient_overlap"
+        for idx, quote in enumerate(quotes):
+            supported, reason, overlap, required = _claim_pair_supported(
+                claim, claim_tokens, quote
+            )
+            if supported:
+                break
+            if len(overlap) > len(best_overlap):
+                best_idx, best_overlap, best_required, best_reason = idx, overlap, required, reason
+        else:
+            failures.append(
+                ClaimSupportFailure(
+                    claim=claim,
+                    reason=best_reason,  # type: ignore[arg-type]
+                    matched_evidence_idx=best_idx,
+                    overlap_tokens=best_overlap,
+                    required_overlap=best_required,
+                )
+            )
+
+    if substantive == 0:
+        failures.append(ClaimSupportFailure(answer_text, "no_substantive_claim", None))
+    return ClaimSupportResult(ok=not failures, failures=failures)
+
+
+# --------------------------------------------------------------------------
+# 3. Number extraction + check
 # --------------------------------------------------------------------------
 
 @dataclass
@@ -282,7 +486,7 @@ def check_numbers(answer_text: str, allowed_sources: list[str]) -> NumberCheckRe
 
 
 # --------------------------------------------------------------------------
-# 3. validate_answer — điều phối
+# 4. validate_answer — điều phối
 # --------------------------------------------------------------------------
 
 @dataclass
