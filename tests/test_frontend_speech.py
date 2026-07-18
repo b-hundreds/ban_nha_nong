@@ -60,10 +60,16 @@ class FakeUtterance {
   constructor(text) { this.text = text; this.lang = ""; this.rate = 1; this.voice = null; }
 }
 const vietnameseVoice = { lang: "vi-VN", name: "Vietnamese" };
+const voiceState = { voices: [{ lang: "en-US", name: "English" }, vietnameseVoice] };
 const speechSynthesis = {
-  getVoices() { return [{ lang: "en-US", name: "English" }, vietnameseVoice]; },
+  voiceHandler: null,
+  getVoices() { return voiceState.voices; },
   speak(utterance) { utterances.push(utterance); },
   cancel() { metrics.cancelCalls += 1; },
+  addEventListener(name, handler) { if (name === "voiceschanged") this.voiceHandler = handler; },
+  removeEventListener(name, handler) {
+    if (name === "voiceschanged" && this.voiceHandler === handler) this.voiceHandler = null;
+  },
 };
 
 const window = { speechSynthesis, SpeechSynthesisUtterance: FakeUtterance, crypto: {} };
@@ -81,10 +87,13 @@ const sandbox = {
   utterances,
   vietnameseVoice,
   metrics,
+  voiceState,
+  statusLine: new FakeElement("p"),
 };
 
 vm.createContext(sandbox);
 vm.runInContext(fs.readFileSync(process.argv[1], "utf8"), sandbox, { filename: process.argv[1] });
+vm.runInContext("els.statusLine = statusLine", sandbox);
 vm.runInContext(`
   const answer = {
     answer_segments: [
@@ -120,6 +129,58 @@ vm.runInContext(`
   }
   if (metrics.cancelCalls < 2) throw new Error("speech synthesis cancel was not called");
 `, sandbox);
+
+async function testDelayedAndMissingVietnameseVoices() {
+  voiceState.voices = [{ lang: "en-US", name: "English" }];
+  const delayed = vm.runInContext("waitForVietnameseVoice(100)", sandbox);
+  setTimeout(() => {
+    voiceState.voices = [vietnameseVoice];
+    speechSynthesis.voiceHandler?.();
+  }, 0);
+  if (await delayed !== vietnameseVoice) throw new Error("delayed Vietnamese voice was not selected");
+
+  voiceState.voices = [{ lang: "en-US", name: "English" }];
+  const missing = await vm.runInContext("waitForVietnameseVoice(5)", sandbox);
+  if (missing !== null) throw new Error("English voice was accepted as Vietnamese fallback");
+
+  metrics.ttsCalls = 0;
+  metrics.audioPlayCalls = 0;
+  sandbox.fetch = async (url, options) => {
+    if (url !== "/api/tts" || JSON.parse(options.body).text !== "Câu trả lời tiếng Việt.") {
+      throw new Error("Google TTS fallback request is malformed");
+    }
+    metrics.ttsCalls += 1;
+    return { ok: true, blob: async () => ({ size: 8 }) };
+  };
+  window.URL = {
+    createObjectURL() { return "blob:google-tts"; },
+    revokeObjectURL() { metrics.revoked = true; },
+  };
+  window.Audio = class {
+    constructor(url) { this.url = url; metrics.lastAudio = this; }
+    play() { metrics.audioPlayCalls += 1; return Promise.resolve(); }
+    pause() {}
+  };
+  vm.runInContext("waitForVietnameseVoice = () => Promise.resolve(null)", sandbox);
+  await vm.runInContext(`(async () => {
+    const fallback = renderSpeechButton("Câu trả lời tiếng Việt.").children[0];
+    fallback.dispatch("click");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    if (metrics.ttsCalls !== 1 || metrics.audioPlayCalls !== 1) {
+      throw new Error("missing vi-VN voice did not play Google TTS audio");
+    }
+    metrics.lastAudio.onended();
+    if (fallback.attributes.get("aria-pressed") !== "false" || !metrics.revoked) {
+      throw new Error("Google TTS playback did not clean up after ending");
+    }
+  })()`, sandbox);
+}
+
+testDelayedAndMissingVietnameseVoices().catch((error) => {
+  console.error(error.stack || error);
+  process.exitCode = 1;
+});
 """
 
     completed = subprocess.run(

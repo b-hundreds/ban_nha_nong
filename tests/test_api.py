@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
+from app.backend import tts
 from app.backend.api import app, HANDOFF_DB
 
 client = TestClient(app)
@@ -211,6 +212,54 @@ def test_transcribe_khong_co_google_creds_dung_whisper(monkeypatch):
     assert resp.status_code == 200
     assert resp.json()["text"] == "xin chào"
     mock_google.assert_not_awaited()
+
+
+def test_tts_khong_co_google_credentials_tra_503(monkeypatch):
+    monkeypatch.delenv("GOOGLE_APPLICATION_CREDENTIALS", raising=False)
+    resp = client.post("/api/tts", json={"text": "Xin chào bác"})
+    assert resp.status_code == 503
+    assert "Google Text-to-Speech" in resp.json()["detail"]
+
+
+def test_tts_tra_mp3_tu_google(tmp_path, monkeypatch):
+    creds_file = tmp_path / "gcp.json"
+    creds_file.write_text("{}")
+    monkeypatch.setenv("GOOGLE_APPLICATION_CREDENTIALS", str(creds_file))
+    with patch(
+        "app.backend.api.tts.synthesize_google",
+        new=AsyncMock(return_value=b"fake-mp3"),
+    ) as mock_tts:
+        resp = client.post("/api/tts", json={"text": "Xin chào bác"})
+    assert resp.status_code == 200
+    assert resp.headers["content-type"].startswith("audio/mpeg")
+    assert resp.content == b"fake-mp3"
+    mock_tts.assert_awaited_once_with("Xin chào bác")
+
+
+def test_tts_google_loi_tra_502(tmp_path, monkeypatch):
+    creds_file = tmp_path / "gcp.json"
+    creds_file.write_text("{}")
+    monkeypatch.setenv("GOOGLE_APPLICATION_CREDENTIALS", str(creds_file))
+    with patch(
+        "app.backend.api.tts.synthesize_google",
+        new=AsyncMock(side_effect=RuntimeError("boom")),
+    ):
+        resp = client.post("/api/tts", json={"text": "Xin chào bác"})
+    assert resp.status_code == 502
+    assert "giọng đọc" in resp.json()["detail"].lower()
+
+
+def test_tts_api_chua_bat_tra_503_co_huong_dan(tmp_path, monkeypatch):
+    creds_file = tmp_path / "gcp.json"
+    creds_file.write_text("{}")
+    monkeypatch.setenv("GOOGLE_APPLICATION_CREDENTIALS", str(creds_file))
+    with patch(
+        "app.backend.api.tts.synthesize_google",
+        new=AsyncMock(side_effect=tts.TtsServiceDisabledError("SERVICE_DISABLED")),
+    ):
+        resp = client.post("/api/tts", json={"text": "Xin chào bác"})
+    assert resp.status_code == 503
+    assert "bật" in resp.json()["detail"].lower()
 
 
 def test_root_serves_html():

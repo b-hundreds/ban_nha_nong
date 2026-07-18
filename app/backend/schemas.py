@@ -73,6 +73,10 @@ class TranscribeResponse(BaseModel):
     text: str
 
 
+class TtsRequest(BaseModel):
+    text: str = Field(min_length=1)
+
+
 class HandoffRequest(BaseModel):
     session_id: str | None = None
     transcript: str

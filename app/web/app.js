@@ -40,6 +40,9 @@ const speechState = {
   index: 0,
   token: 0,
   speaking: false,
+  voice: null,
+  audio: null,
+  audioUrl: null,
 };
 
 const els = {};
@@ -588,7 +591,7 @@ function renderAssistantMessage(message, conversation) {
     row.appendChild(renderHandoff(segment, message.answer, message.text, conversation));
   });
   const speechText = answerSpeechText(message.answer);
-  if (speechText && speechSupported()) row.appendChild(renderSpeechButton(speechText));
+  if (speechText) row.appendChild(renderSpeechButton(speechText));
   return row;
 }
 
@@ -688,11 +691,29 @@ function preferredVietnameseVoice() {
     || null;
 }
 
+function waitForVietnameseVoice(timeoutMs = 1600) {
+  const available = preferredVietnameseVoice();
+  if (available) return Promise.resolve(available);
+
+  return new Promise((resolve) => {
+    let finished = false;
+    const synth = window.speechSynthesis;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(timer);
+      synth.removeEventListener?.("voiceschanged", onVoicesChanged);
+      resolve(preferredVietnameseVoice());
+    };
+    const onVoicesChanged = () => {
+      if (preferredVietnameseVoice()) finish();
+    };
+    const timer = setTimeout(finish, timeoutMs);
+    synth.addEventListener?.("voiceschanged", onVoicesChanged);
+  });
+}
+
 function toggleSpeech(button, text) {
-  if (!speechSupported()) {
-    setStatus("Trình duyệt này chưa hỗ trợ đọc văn bản.");
-    return;
-  }
   if (speechState.speaking && speechState.button === button) {
     stopSpeech();
     return;
@@ -706,7 +727,66 @@ function toggleSpeech(button, text) {
   speechState.speaking = true;
   const token = speechState.token;
   setSpeechButtonState(button, true);
-  speakNextChunk(token);
+  if (!speechSupported()) {
+    void playGoogleSpeech(token, text);
+    return;
+  }
+  const availableVoice = preferredVietnameseVoice();
+  if (availableVoice) {
+    speechState.voice = availableVoice;
+    speakNextChunk(token);
+    return;
+  }
+
+  setStatus("Đang tải giọng đọc tiếng Việt...");
+  waitForVietnameseVoice().then((voice) => {
+    if (token !== speechState.token || !speechState.speaking) return;
+    if (!voice) {
+      void playGoogleSpeech(token, text);
+      return;
+    }
+    speechState.voice = voice;
+    setStatus("");
+    speakNextChunk(token);
+  });
+}
+
+async function playGoogleSpeech(token, text) {
+  if (token !== speechState.token || !speechState.speaking) return;
+  setStatus("Thiết bị chưa có giọng Việt, đang tạo giọng đọc Google...");
+  try {
+    const response = await fetch("/api/tts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+    });
+    if (!response.ok) {
+      const body = await safeJson(response);
+      throw new Error(body.detail || "Không tạo được giọng đọc Google.");
+    }
+    const blob = await response.blob();
+    if (token !== speechState.token || !speechState.speaking) return;
+    if (!blob.size) throw new Error("Máy chủ không trả về âm thanh.");
+
+    const audioUrl = window.URL.createObjectURL(blob);
+    const audio = new window.Audio(audioUrl);
+    speechState.audio = audio;
+    speechState.audioUrl = audioUrl;
+    audio.onended = () => {
+      if (token === speechState.token) finishSpeech(token);
+    };
+    audio.onerror = () => {
+      if (token !== speechState.token) return;
+      finishSpeech(token);
+      setStatus("Không phát được file giọng đọc Google.");
+    };
+    await audio.play();
+    if (token === speechState.token) setStatus("");
+  } catch (error) {
+    if (token !== speechState.token) return;
+    finishSpeech(token);
+    setStatus(error?.message || "Không tạo được giọng đọc tiếng Việt.");
+  }
 }
 
 function speakNextChunk(token) {
@@ -719,8 +799,8 @@ function speakNextChunk(token) {
   const utterance = new window.SpeechSynthesisUtterance(speechState.chunks[speechState.index]);
   utterance.lang = "vi-VN";
   utterance.rate = 0.95;
-  const voice = preferredVietnameseVoice();
-  if (voice) utterance.voice = voice;
+  // Không để trình duyệt tự fallback sang giọng tiếng Anh.
+  utterance.voice = speechState.voice;
   utterance.onend = () => {
     if (token !== speechState.token) return;
     speechState.index += 1;
@@ -737,21 +817,39 @@ function speakNextChunk(token) {
 
 function finishSpeech(token) {
   if (token !== speechState.token) return;
+  cleanupGoogleAudio();
   setSpeechButtonState(speechState.button, false);
   speechState.button = null;
   speechState.chunks = [];
   speechState.index = 0;
   speechState.speaking = false;
+  speechState.voice = null;
+}
+
+function cleanupGoogleAudio() {
+  if (speechState.audio) {
+    speechState.audio.onended = null;
+    speechState.audio.onerror = null;
+    speechState.audio.pause();
+    speechState.audio.currentTime = 0;
+    speechState.audio = null;
+  }
+  if (speechState.audioUrl) {
+    window.URL.revokeObjectURL(speechState.audioUrl);
+    speechState.audioUrl = null;
+  }
 }
 
 function stopSpeech() {
   const oldButton = speechState.button;
   speechState.token += 1;
   if (speechSupported()) window.speechSynthesis.cancel();
+  cleanupGoogleAudio();
   speechState.button = null;
   speechState.chunks = [];
   speechState.index = 0;
   speechState.speaking = false;
+  speechState.voice = null;
   setSpeechButtonState(oldButton, false);
 }
 
