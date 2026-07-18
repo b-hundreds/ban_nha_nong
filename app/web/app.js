@@ -644,8 +644,9 @@ function answerSpeechText(answer) {
     } else if (segment.type === "dose_block") {
       if (segment.product) parts.push(`Sản phẩm ${segment.product}.`);
       if (segment.ai) parts.push(`Hoạt chất ${segment.ai}.`);
-      const guidance = segment.note || segment.dose_text;
-      if (guidance) parts.push(`${guidance}.`);
+      if (segment.dose_text) parts.push(`Liều dùng ${segment.dose_text}.`);
+      if (Number.isInteger(segment.phi_days)) parts.push(`Thời gian cách ly ${segment.phi_days} ngày.`);
+      if (segment.note && segment.note !== segment.dose_text) parts.push(`${segment.note}.`);
     } else if (segment.type === "abstain" && segment.reason) {
       parts.push(segment.reason);
     }
@@ -906,10 +907,34 @@ function renderDoseList(segments, region) {
     const ai = document.createElement("p");
     ai.className = "dose-ai";
     ai.textContent = `Hoạt chất: ${segment.ai}`;
-    const note = document.createElement("span");
-    note.className = "dose-note";
-    note.textContent = segment.note || segment.dose_text;
-    item.append(product, ai, note);
+    const guidance = document.createElement("p");
+    guidance.className = "dose-guidance";
+    guidance.textContent = `Liều dùng: ${segment.dose_text}`;
+    const meta = document.createElement("div");
+    meta.className = "dose-meta";
+    if (Number.isInteger(segment.phi_days)) {
+      const phi = document.createElement("span");
+      phi.className = "dose-phi";
+      phi.textContent = `Thời gian cách ly: ${segment.phi_days} ngày`;
+      meta.appendChild(phi);
+    }
+    if (segment.note && segment.note !== segment.dose_text) {
+      const note = document.createElement("span");
+      note.className = "dose-note";
+      note.textContent = segment.note;
+      meta.appendChild(note);
+    }
+    if (segment.source_url) {
+      const source = document.createElement("a");
+      source.className = "dose-source";
+      source.href = segment.source_url;
+      source.target = "_blank";
+      source.rel = "noopener noreferrer";
+      source.textContent = "Nguồn liều";
+      meta.appendChild(source);
+    }
+    item.append(product, ai, guidance);
+    if (meta.children.length) item.appendChild(meta);
     list.appendChild(item);
   });
   return list;

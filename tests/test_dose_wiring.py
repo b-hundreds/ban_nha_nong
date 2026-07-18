@@ -65,7 +65,7 @@ def test_dose_verified_hien_so_that_va_xep_len_dau(monkeypatch, tmp_path):
 
     result = pipeline.answer("lúa bị rầy nâu xịt thuốc gì", "an_giang", "2026-07-18")
     blocks = _dose_blocks(result)
-    assert len(blocks) == 5
+    assert len(blocks) == 1
 
     first = blocks[0]
     assert first["product"] == _TARGET_LABEL
@@ -76,14 +76,29 @@ def test_dose_verified_hien_so_that_va_xep_len_dau(monkeypatch, tmp_path):
     assert first["source_url"] == _SOURCE_URL
     assert first["note"] == "Liều chép nguyên văn từ nhãn đăng ký"
 
-    # Phần còn lại giữ nguyên thứ tự gốc (ổn định), vẫn placeholder như cũ.
-    rest = [b["product"] for b in blocks[1:]]
-    assert rest == _OTHER_LABELS_IN_ORDER
-    for b in blocks[1:]:
-        assert b["phi_days"] is None
-        assert b["dose_text"] == pipeline._DOSE_TEXT
-        assert b["note"] == pipeline._DOSE_NOTE
-        assert b.get("source_url") is None
+    # Khi đã có ít nhất một liều verified, không trộn thêm sản phẩm placeholder.
+    assert not any(b["dose_text"] == pipeline._DOSE_TEXT for b in blocks)
+
+
+def test_lieu_nam_ngoai_top_5_van_duoc_chon(monkeypatch, tmp_path):
+    trade_name = "Abachezt"
+    formulation = "666WG"  # vị trí 9 trong registry lúa/rầy nâu, ngoài top 5 cũ
+
+    def row(entry_pass: str) -> str:
+        return (
+            f"{trade_name},{formulation},Hoạt chất test,lúa,rầy nâu,"
+            f'"250 g/ha","400 lít nước/ha",7,phun,kg/ha,'
+            f"https://example.com/abachezt,nguồn test,2026-07-18T10:00:00,{entry_pass}\n"
+        )
+
+    db_path, report = _build_labels_db(tmp_path, row("1") + row("2"))
+    assert report["n_verified"] == 1
+    monkeypatch.setattr(pipeline, "LABELS_DB_PATH", db_path)
+
+    result = pipeline.answer("lúa bị rầy nâu xịt thuốc gì", "an_giang", "2026-07-18")
+    blocks = _dose_blocks(result)
+    assert [block["product"] for block in blocks] == [f"{trade_name} ({formulation})"]
+    assert blocks[0]["dose_text"].startswith("250 g/ha")
 
 
 def test_khong_co_labels_db_van_placeholder_khong_loi(monkeypatch, tmp_path):

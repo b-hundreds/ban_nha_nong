@@ -34,4 +34,4 @@ def test_chi_vung_tin_nhan_duoc_cuon():
 
 
 def test_service_worker_doi_cache_sau_khi_sua_layout():
-    assert 'CACHE_NAME = "bnn-shell-v11"' in SERVICE_WORKER
+    assert 'CACHE_NAME = "bnn-shell-v12"' in SERVICE_WORKER

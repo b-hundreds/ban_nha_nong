@@ -653,8 +653,7 @@ def _path_a_segments(
     total_override: int | None = None,
 ) -> tuple[list[dict], list[dict]]:
     vocab = _load_vocab()
-    shown = hits[:MAX_PRODUCTS]
-    if not shown:
+    if not hits:
         content = (
             f"Em kiểm tra danh mục thuốc BVTV hiện hành nhưng chưa thấy sản phẩm nào đăng ký chính thức "
             f"cho \"{pest}\" trên \"{crop}\" ở {region_name}. Trong lúc chờ, bác giữ nguyên tắc 4 đúng "
@@ -670,21 +669,41 @@ def _path_a_segments(
         return segments, []
 
     lconn = _open_labels_conn()
+    verified_doses: dict[tuple[str, str], object] = {}
     try:
-        doses = [_lookup_dose(lconn, hit.trade_name, crop, pest, formulation=hit.formulation) for hit in shown]
+        if lconn is not None:
+            verified_doses = db_module.get_verified_doses(lconn, crop, pest)
+    except sqlite3.Error:
+        verified_doses = {}
     finally:
         if lconn is not None:
             lconn.close()
 
-    # Ưu tiên hiển thị: sản phẩm có dose verified xếp lên trước (nông dân cần liều
-    # dùng được ngay) — sorted() ổn định nên phần còn lại giữ nguyên thứ tự gốc.
-    order = sorted(range(len(shown)), key=lambda i: 0 if doses[i] is not None else 1)
-    shown = [shown[i] for i in order]
-    doses = [doses[i] for i in order]
+    verified_hits: list[tuple[object, object]] = []
+    for hit in hits:
+        key = (hit.trade_name.strip().casefold(), (hit.formulation or "").strip().casefold())
+        dose = verified_doses.get(key)
+        if dose is not None:
+            verified_hits.append((hit, dose))
+
+    # Nếu có dù chỉ một sản phẩm có liều verified thì chỉ hiển thị nhóm đó.
+    # Top registry không có liều chỉ là fallback khi toàn bộ tập kết quả thiếu liều.
+    selected = (
+        verified_hits[:MAX_PRODUCTS]
+        if verified_hits
+        else [(hit, None) for hit in hits[:MAX_PRODUCTS]]
+    )
+    shown = [item[0] for item in selected]
+    doses = [item[1] for item in selected]
 
     total = total_override if total_override is not None else len(hits)
     intro = f"Dạ, với {crop} bị {pest} ở {region_name}, em tìm được {total} sản phẩm còn phép dùng."
-    if total > len(shown):
+    if verified_hits:
+        intro += (
+            f" Trong đó có {len(verified_hits)} sản phẩm đã có liều lượng được xác thực; "
+            f"gửi bác {len(shown)} sản phẩm ưu tiên:"
+        )
+    elif total > len(shown):
         intro += f" Gửi bác {len(shown)} sản phẩm tiêu biểu, bác hỏi thêm cán bộ khuyến nông xã để chọn loại có sẵn tại đại lý gần nhà:"
     else:
         intro += " Gửi bác danh sách:"
@@ -1158,6 +1177,9 @@ def answer(
 
         slots = {"crop": crop, "pest": pest, "region": region}
         region_name = REGION_NAMES.get(region, region)
+        multi_crop_note = None
+        if crop and len(crop_seen) > 1:
+            multi_crop_note = f"Bác nhắc tới cả {' và '.join(crop_seen)}, em trả lời cho {crop} trước nhé. "
 
         # --- P1-G: small-talk layer — chạy TRƯỚC clarify/product-guard/path A/path B.
         # Chỉ khi câu KHÔNG có slot nào (crop/pest/product mention) và ngắn (< 10 từ) —
@@ -1250,6 +1272,24 @@ def answer(
                     )
                     if web_response is not None:
                         return web_response
+                if decision.tool_name == "list_registered_products":
+                    # Tool response is only a preview; dose priority must scan
+                    # every registered hit before applying the display top-k.
+                    all_hits = db_module.lookup_products(conn, crop, pest, on_date)
+                    segments, products = _path_a_segments(
+                        region_name,
+                        crop,
+                        pest,
+                        all_hits,
+                        multi_crop_note=multi_crop_note,
+                        total_override=tool_result.total,
+                    )
+                    return {
+                        "risk_class": "A",
+                        "answer_segments": segments,
+                        "slots": slots,
+                        "products": products,
+                    }
                 answer_plan = registry_agent.synthesize_plan(tool_result)
                 return _render_registry_tool(tool_result, answer_plan, region, crop, pest)
             except Exception:
@@ -1276,10 +1316,6 @@ def answer(
                 "slots": slots,
                 "products": [],
             }
-
-        multi_crop_note = None
-        if crop and len(crop_seen) > 1:
-            multi_crop_note = f"Bác nhắc tới cả {' và '.join(crop_seen)}, em trả lời cho {crop} trước nhé. "
 
         # --- P1-G: minh bạch phạm vi khi crop ngoài KB (chỉ khi KHÔNG có pest slot —
         # có pest thì để path A ở trên xử lý, registry.db độc lập với phạm vi KB) ---

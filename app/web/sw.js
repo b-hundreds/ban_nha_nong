@@ -2,7 +2,7 @@
 
 /* Cache tĩnh tối thiểu cho app shell — không bao giờ cache /api/*. */
 
-const CACHE_NAME = "bnn-shell-v11";
+const CACHE_NAME = "bnn-shell-v12";
 const SHELL_URLS = ["/", "/app.css", "/app.js", "/manifest.webmanifest", "/icon.svg"];
 
 self.addEventListener("install", (event) => {

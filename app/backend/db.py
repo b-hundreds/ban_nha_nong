@@ -184,3 +184,23 @@ def get_dose(lconn, trade_name: str, crop: str, pest: str, formulation: str | No
         return None
     return LabelDose(row["product_trade_name"], row["formulation"], row["crop"], row["pest"],
                      row["dose_text"], row["water_text"], row["phi_days"], row["method"], row["source_url"])
+
+
+def get_verified_doses(lconn, crop: str, pest: str) -> dict[tuple[str, str], LabelDose]:
+    """Load every verified dose for one crop/pest pair in a single query."""
+    rows = lconn.execute(
+        """SELECT * FROM label_doses WHERE verified=1 AND entry_pass=1
+           AND crop=? AND pest=? ORDER BY product_trade_name, formulation""",
+        (crop.strip().lower(), pest.strip().lower()),
+    ).fetchall()
+    doses: dict[tuple[str, str], LabelDose] = {}
+    for row in rows:
+        key = (
+            row["product_trade_name"].strip().casefold(),
+            (row["formulation"] or "").strip().casefold(),
+        )
+        doses[key] = LabelDose(
+            row["product_trade_name"], row["formulation"], row["crop"], row["pest"],
+            row["dose_text"], row["water_text"], row["phi_days"], row["method"], row["source_url"],
+        )
+    return doses

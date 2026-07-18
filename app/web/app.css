@@ -702,8 +702,13 @@ svg {
 .dose-row { padding: 13px; border-bottom: 1px solid var(--border); }
 .dose-row:last-child { border-bottom: 0; }
 .dose-product { margin: 0; font-size: 0.96rem; font-weight: 750; }
-.dose-ai { margin: 3px 0 8px; color: var(--text-soft); font-size: 0.82rem; }
+.dose-ai { margin: 3px 0 7px; color: var(--text-soft); font-size: 0.82rem; }
+.dose-guidance { margin: 0; padding: 8px 10px; border-radius: 6px; background: var(--accent-soft); color: #1f513b; font-size: 0.84rem; font-weight: 700; white-space: pre-line; }
+.dose-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 7px; }
 .dose-note { display: inline-flex; padding: 3px 7px; border-radius: 5px; background: var(--accent-soft); color: var(--accent); font-size: 0.74rem; font-weight: 700; }
+.dose-phi { display: inline-flex; padding: 3px 7px; border-radius: 5px; background: var(--warning-soft); color: var(--warning); font-size: 0.74rem; font-weight: 700; }
+.dose-source { display: inline-flex; padding: 3px 7px; border: 1px solid var(--border); border-radius: 5px; color: var(--text-soft); font-size: 0.74rem; font-weight: 650; text-decoration: none; }
+.dose-source:hover { border-color: var(--border-strong); color: var(--accent); }
 
 .citation-list { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 14px; }
 .citation-link { display: inline-flex; max-width: 100%; align-items: center; gap: 6px; border: 1px solid var(--border); border-radius: 6px; padding: 6px 9px; color: var(--text-soft); text-decoration: none; font-size: 0.76rem; }
