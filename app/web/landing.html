@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#2f6b4f" />
+  <meta name="description" content="Bạn Nhà Nông - trợ lý nông nghiệp dựa trên nguồn chính thống. Hỏi về cây trồng, sâu bệnh, thuốc bảo vệ thực vật hoặc mùa vụ." />
+  <title>Bạn Nhà Nông — Trợ lý nông nghiệp tiếng Việt</title>
+  <link rel="icon" href="icon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="landing.css" />
+</head>
+<body>
+  <nav class="nav">
+    <div class="nav-inner">
+      <a class="nav-brand" href="/" aria-label="Bạn Nhà Nông">
+        <span class="nav-mark">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19.5 4.5C13 4.2 7.1 7 5 12.2c-1.2 3 .4 5.6 3.3 6.2 5.2 1.1 10.5-4.3 11.2-13.9Z"/><path d="M4 21c2.2-5.3 6-8.8 11.5-11"/></svg>
+        </span>
+        <span class="nav-title">Bạn Nhà Nông</span>
+      </a>
+      <div class="nav-actions">
+        <button type="button" class="btn btn-ghost" id="navLoginBtn">Đăng nhập</button>
+        <a href="/chat" class="btn btn-primary">Trò chuyện ngay</a>
+      </div>
+    </div>
+  </nav>
+
+  <section class="hero">
+    <div class="hero-inner">
+      <span class="hero-badge">Nguồn dữ liệu chính thống</span>
+      <h1 class="hero-h1">Hỏi về nhà nông,<br/>trả lời bằng nguồn thật</h1>
+      <p class="hero-sub">Bạn Nhà Nông là trợ lý nông nghiệp tiếng Việt. Mỗi khuyến nghị đều truy được về thông tư, quy trình hoặc nhãn thuốc chính thức — không bịa, đặc biệt là con số liều lượng.</p>
+      <div class="hero-ctas">
+        <a href="/chat" class="btn btn-primary btn-lg">Trò chuyện ngay</a>
+        <button type="button" class="btn btn-outline btn-lg" id="heroLoginBtn">Đăng nhập</button>
+      </div>
+      <p class="hero-note">Không cần đăng nhập cũng trò chuyện được</p>
+    </div>
+    <div class="hero-visual">
+      <div class="chat-preview">
+        <div class="cp-header">
+          <span class="cp-dot"></span>
+          <span>Bạn Nhà Nông</span>
+        </div>
+        <div class="cp-body">
+          <div class="cp-msg cp-user">Lúa bị rầy nâu thì xịt thuốc gì?</div>
+          <div class="cp-msg cp-bot">
+            <span class="cp-bot-mark">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19.5 4.5C13 4.2 7.1 7 5 12.2c-1.2 3 .4 5.6 3.3 6.2 5.2 1.1 10.5-4.3 11.2-13.9Z"/><path d="M4 21c2.2-5.3 6-8.8 11.5-11"/></svg>
+            </span>
+            <div class="cp-bot-content">
+              <p>3 sản phẩm phù hợp theo Thông tư 75/2025:</p>
+              <div class="cp-product">
+                <strong>Regent 800WG</strong>
+                <span>Fipronil 800g/kg</span>
+                <span class="cp-dose">Liều từ nhãn: 10g/100L</span>
+              </div>
+              <div class="cp-product">
+                <strong>Applaud 25WP</strong>
+                <span>Buprofezin 250g/kg</span>
+                <span class="cp-dose">Liều từ nhãn: 200g/ha</span>
+              </div>
+              <div class="cp-cite">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M20 4 10 14"/><path d="M18 13v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h6"/></svg>
+                <span>TT 75/2025/TT-BNNMT</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="problem">
+    <div class="problem-inner">
+      <div class="problem-text">
+        <h2>Nông dân hỏi, AI trả lời — nhưng số liệu lấy từ đâu?</h2>
+        <p>Nhiều trợ lý AI đưa ra khuyến nghị nông nghiệp mà không truy được nguồn. Liều lượng bịa, thông tư cũ, thuốc đã cấm vẫn khuyên dùng — sai một con số, thiệt cả mùa vụ.</p>
+        <p class="problem-highlight">Bạn Nhà Nông được xây quanh một nguyên tắc: <strong>mọi con số đều phải chép nguyên văn từ nguồn chính thống</strong> — không ngoại lệ.</p>
+      </div>
+      <div class="problem-img">
+        <img src="https://images.unsplash.com/photo-1574323347407-f5e1ad6d020b?w=800&h=600&fit=crop&q=80" alt="Ruộng lúa xanh ở Việt Nam" width="800" height="600" loading="lazy" />
+      </div>
+    </div>
+  </section>
+
+  <section class="features">
+    <div class="features-inner">
+      <div class="features-header">
+        <h2>Mỗi tính năng đều vì an toàn cho nhà nông</h2>
+        <p>Không chỉ trả lời nhanh — mà trả lời đúng, truy được nguồn, và biết nói không khi không chắc.</p>
+      </div>
+      <div class="features-grid">
+        <div class="feature-card feature-wide">
+          <div class="feature-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12h6M9 16h6M5 3h14a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"/></svg>
+          </div>
+          <h3>Tra thuốc theo danh mục pháp lý hiện hành</h3>
+          <p>Hỏi "lúa bị rầy nâu xịt thuốc gì" — nhận phiếu thuốc kèm hoạt chất, liều lượng chép nguyên văn từ nhãn, và trích dẫn thông tư hiện hành. Danh mục 6.883 sản phẩm, versioned theo ngày hiệu lực.</p>
+          <div class="feature-detail">
+            <div class="fd-item">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4 4L19 6"/></svg>
+              <span>Liều + ngày cách ly chép từ nhãn, không do AI sinh ra</span>
+            </div>
+            <div class="fd-item">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4 4L19 6"/></svg>
+              <span>Thuốc bị cấm → trả lời đúng mốc hiệu lực</span>
+            </div>
+            <div class="fd-item">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4 4L19 6"/></svg>
+              <span>Tự cập nhật khi thông tư mới ban hành</span>
+            </div>
+          </div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10Z"/><path d="m9 12 2 2 4-4"/></svg>
+          </div>
+          <h3>Validator chống bịa số</h3>
+          <p>Mỗi con số trong câu trả lời đều được đối chiếu máy với nguồn gốc. Số liệu chỉ được nêu khi chép nguyên văn — AI không tự sáng tạo liều lượng.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7h.01"/></svg>
+          </div>
+          <h3>Biết từ chối đúng lúc</h3>
+          <p>Không đủ căn cứ — nói rõ phạm vi hỗ trợ. Xin liều gấp đôi — từ chối + cảnh báo an toàn. Khi cần, chuyển kết nối cán bộ khuyến nông thật.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>
+          </div>
+          <h3>Tư vấn canh tác từ tài liệu chính thống</h3>
+          <p>Quy trình Cục Trồng trọt, lịch thời vụ của Sở Nông nghiệp, FAQ khuyến nông — trả lời kèm trích dẫn, không tự sáng tác.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v3M8 22h8"/></svg>
+          </div>
+          <h3>Nói hay gõ đều được</h3>
+          <p>Nhận giọng nói tiếng Việt qua Google STT Chirp 3, trả lời bằng giọng đọc. Không có mic — gõ chữ vẫn dùng được ngay.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="how-it-works">
+    <div class="hiw-inner">
+      <h2>Cách hoạt động</h2>
+      <p class="hiw-sub">Ba bước từ câu hỏi đến khuyến nghị có nguồn</p>
+      <div class="hiw-steps">
+        <div class="hiw-step">
+          <div class="hiw-num">1</div>
+          <div class="hiw-content">
+            <h3>Hỏi bằng tiếng Việt</h3>
+            <p>Gõ hoặc nói câu hỏi về cây trồng, sâu bệnh, thuốc hoặc mùa vụ. Ví dụ: "Lúa bị rầy nâu thì xịt thuốc gì?"</p>
+          </div>
+        </div>
+        <div class="hiw-step">
+          <div class="hiw-num">2</div>
+          <div class="hiw-content">
+            <h3>Tra cứu nguồn chính thống</h3>
+            <p>Hệ thống tìm trong danh mục pháp lý 6.883 sản phẩm, quy trình Cục Trồng trọt, lịch thời vụ Sở Nông nghiệp — không tìm trên mạng chung.</p>
+          </div>
+        </div>
+        <div class="hiw-step">
+          <div class="hiw-num">3</div>
+          <div class="hiw-content">
+            <h3>Nhận câu trả lời có trích dẫn</h3>
+            <p>Phiếu thuốc kèm hoạt chất, liều từ nhãn, thông tư áp dụng. Mỗi con số đều truy được về nguồn — hoặc hệ thống nói rõ là không đủ căn cứ.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="showcase">
+    <div class="showcase-inner">
+      <div class="showcase-img">
+        <img src="https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=1200&h=800&fit=crop&q=80" alt="Cánh đồng lúa chín vàng" width="1200" height="800" loading="lazy" />
+      </div>
+      <div class="showcase-text">
+        <h2>Tư vấn theo khu vực, đúng mùa vụ</h2>
+        <p>Chọn khu vực để nhận khuyến nghị phù hợp với cây trồng, thời tiết và lịch thời vụ địa phương. Lịch xuống giống ở An Giang khác Đắk Lắk — Bạn Nhà Nông biết điều đó.</p>
+        <div class="showcase-regions">
+          <div class="sr-item">
+            <span class="sr-dot"></span>
+            <div>
+              <strong>An Giang</strong>
+              <p>Lúa, mùa vụ Đồng bằng sông Cửu Long. Lịch thời vụ từ Sở NN&PTNT An Giang.</p>
+            </div>
+          </div>
+          <div class="sr-item">
+            <span class="sr-dot"></span>
+            <div>
+              <strong>Đắk Lắk</strong>
+              <p>Cà phê, sầu riêng, mùa vụ Tây Nguyên. Quy trình từ Sở NN&PTNT Đắk Lắk.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="safety">
+    <div class="safety-inner">
+      <div class="safety-text">
+        <h2>An toàn là ưu tiên đầu tiên</h2>
+        <p>Khi nông dân xin liều gấp đôi "cho nhanh", Bạn Nhà Nông không chiều theo. Khi không đủ căn cứ, hệ thống nói rõ phạm vi thay vì bịa câu trả lời cho hoàn chỉnh.</p>
+        <div class="safety-list">
+          <div class="sl-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/><path d="M12 9v4M12 17h.01"/></svg>
+            <div>
+              <strong>Từ chối liều vượt mức</strong>
+              <p>"Cho tôi liều gấp đôi" → từ chối + cảnh báo an toàn</p>
+            </div>
+          </div>
+          <div class="sl-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            <div>
+              <strong>Chuyển cán bộ khuyến nông</strong>
+              <p>Vượt phạm vi hỗ trợ → tạo phiếu chuyển, nông dân được người thật hỗ trợ</p>
+            </div>
+          </div>
+          <div class="sl-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M20 4 10 14"/><path d="M18 13v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h6"/></svg>
+            <div>
+              <strong>Đính chính pháp lý</strong>
+              <p>Thuốc bị cấm/bị loại → trả lời đúng mốc hiệu lực, không khuyên dùng tiếp</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="safety-img">
+        <img src="https://images.unsplash.com/photo-1523348837708-15d4a09cfac2?w=800&h=600&fit=crop&q=80" alt="Nông dân chăm sóc cây trồng" width="800" height="600" loading="lazy" />
+      </div>
+    </div>
+  </section>
+
+  <section class="stats">
+    <div class="stats-inner">
+      <div class="stat-item">
+        <span class="stat-num">6.883</span>
+        <span class="stat-label">Sản phẩm trong danh mục pháp lý</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-num">412</span>
+        <span class="stat-label">Chunks tài liệu chính thống</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-num">50+</span>
+        <span class="stat-label">Câu eval chống hallucination</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="examples">
+    <div class="examples-inner">
+      <h2>Thử ngay — chỉ cần hỏi</h2>
+      <p class="examples-sub">Mỗi câu đều có thể hỏi bằng giọng nói hoặc gõ chữ</p>
+      <div class="example-grid">
+        <a href="/chat" class="example-card">
+          <div class="example-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19.5 4.5C13 4.2 7.1 7 5 12.2c-1.2 3 .4 5.6 3.3 6.2 5.2 1.1 10.5-4.3 11.2-13.9Z"/><path d="M4 21c2.2-5.3 6-8.8 11.5-11"/></svg>
+          </div>
+          <p class="example-q">"Lúa bị rầy nâu thì xịt thuốc gì?"</p>
+          <span class="example-a">Phiếu thuốc + liều từ nhãn + trích dẫn thông tư</span>
+        </a>
+        <a href="/chat" class="example-card">
+          <div class="example-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/><path d="M12 9v4M12 17h.01"/></svg>
+          </div>
+          <p class="example-q">"Folpan 50WP còn dùng được không?"</p>
+          <span class="example-a">Đính chính mốc pháp lý — còn dùng đến 15/08/2026</span>
+        </a>
+        <a href="/chat" class="example-card">
+          <div class="example-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"/></svg>
+          </div>
+          <p class="example-q">"Tháng 11 ở An Giang xuống giống lúa chưa?"</p>
+          <span class="example-a">Lịch thời vụ từ Sở NN thật, không ước lượng</span>
+        </a>
+        <a href="/chat" class="example-card">
+          <div class="example-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10Z"/><path d="m9 12 2 2 4-4"/></svg>
+          </div>
+          <p class="example-q">"Cho tôi liều gấp đôi cho nhanh"</p>
+          <span class="example-a">Từ chối + cảnh báo an toàn</span>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <section class="cta-section">
+    <div class="cta-inner">
+      <div class="cta-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19.5 4.5C13 4.2 7.1 7 5 12.2c-1.2 3 .4 5.6 3.3 6.2 5.2 1.1 10.5-4.3 11.2-13.9Z"/><path d="M4 21c2.2-5.3 6-8.8 11.5-11"/></svg>
+      </div>
+      <h2>Bắt đầu tư vấn ngay</h2>
+      <p>Không cần đăng ký, không cần tải ứng dụng. Mở trang, hỏi câu hỏi, nhận câu trả lời có nguồn.</p>
+      <div class="cta-buttons">
+        <a href="/chat" class="btn btn-primary btn-lg">Trò chuyện ẩn danh</a>
+        <button type="button" class="btn btn-outline btn-lg" id="ctaLoginBtn">Đăng nhập để lưu lịch sử</button>
+      </div>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <span class="footer-mark">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19.5 4.5C13 4.2 7.1 7 5 12.2c-1.2 3 .4 5.6 3.3 6.2 5.2 1.1 10.5-4.3 11.2-13.9Z"/><path d="M4 21c2.2-5.3 6-8.8 11.5-11"/></svg>
+        </span>
+        <span>Bạn Nhà Nông</span>
+      </div>
+      <p class="footer-copy">Trợ lý nông nghiệp dựa trên nguồn chính thống. Kiểm tra trích dẫn trước khi áp dụng khuyến nghị.</p>
+    </div>
+  </footer>
+
+  <div class="modal-overlay" id="loginModal" hidden>
+    <div class="modal" role="dialog" aria-labelledby="loginTitle" aria-modal="true">
+      <button type="button" class="modal-close" id="modalClose" aria-label="Đóng">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m6 6 12 12M18 6 6 18"/></svg>
+      </button>
+      <h2 id="loginTitle">Đăng nhập</h2>
+      <p class="modal-sub">Đăng nhập để lưu lịch sử trò chuyện trên nhiều thiết bị.</p>
+      <form id="loginForm" class="login-form" novalidate>
+        <div class="field">
+          <label for="loginEmail">Email hoặc số điện thoại</label>
+          <input type="text" id="loginEmail" autocomplete="username" placeholder="email@example.com" required />
+        </div>
+        <div class="field">
+          <label for="loginPassword">Mật khẩu</label>
+          <input type="password" id="loginPassword" autocomplete="current-password" placeholder="Mật khẩu" required />
+        </div>
+        <p class="login-error" id="loginError" hidden></p>
+        <button type="submit" class="btn btn-primary btn-full">Đăng nhập</button>
+      </form>
+      <div class="modal-divider"><span>hoặc</span></div>
+      <a href="/chat" class="btn btn-outline btn-full">Trò chuyện ẩn danh</a>
+      <p class="modal-note">Chưa có tài khoản? <a href="/chat">Vẫn trò chuyện được ngay</a></p>
+    </div>
+  </div>
+
+  <script src="landing.js"></script>
+</body>
+</html>

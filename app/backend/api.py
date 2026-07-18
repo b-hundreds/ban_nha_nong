@@ -11,6 +11,7 @@ from datetime import date
 import httpx
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, HTTPException, Response, UploadFile
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.backend import asr, handoff, history, pipeline, registry_api, tts
@@ -106,6 +107,19 @@ async def synthesize_speech(req: TtsRequest) -> Response:
         media_type="audio/mpeg",
         headers={"Cache-Control": "private, max-age=3600"},
     )
+
+
+# Trang landing ở "/" — app chat chuyển sang "/chat" (endpoint handoff cũ đã
+# chuyển vào app/backend/handoff.py router).
+@app.get("/")
+def landing():
+    return FileResponse(WEB_DIR / "landing.html")
+
+
+@app.get("/chat")
+def chat():
+    return FileResponse(WEB_DIR / "index.html")
+
 
 
 # Đăng ký API routes xong mới mount static — mount "/" chỉ bắt các path không khớp

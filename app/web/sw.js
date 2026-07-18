@@ -2,8 +2,8 @@
 
 /* Cache tĩnh tối thiểu cho app shell — không bao giờ cache /api/*. */
 
-const CACHE_NAME = "bnn-shell-v19";
-const SHELL_URLS = ["/", "/app.css", "/app.js", "/manifest.webmanifest", "/icon.svg"];
+const CACHE_NAME = "bnn-shell-v20";
+const SHELL_URLS = ["/chat", "/app.css", "/app.js", "/manifest.webmanifest", "/icon.svg"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(

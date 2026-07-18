@@ -64,9 +64,8 @@ function init() {
   els.regionBtns = Array.from(document.querySelectorAll("[data-region-btn]"));
 
   els.newChatBtn.addEventListener("click", startNewConversation);
-  els.brandHome.addEventListener("click", (event) => {
-    event.preventDefault();
-    startNewConversation();
+  els.brandHome.addEventListener("click", () => {
+    window.location.href = "/";
   });
   els.sidebarOpen.addEventListener("click", openSidebar);
   els.sidebarClose.addEventListener("click", closeSidebar);

@@ -25,10 +25,15 @@
 * { box-sizing: border-box; }
 
 html,
-body { height: 100%; }
+body {
+  height: 100%;
+  min-height: 100%;
+}
 
 body {
   margin: 0;
+  min-height: 100vh;
+  min-height: 100svh;
   overflow: hidden;
   background: var(--bg);
   color: var(--text);
@@ -87,7 +92,9 @@ svg {
 .app-shell {
   display: grid;
   grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+  height: 100vh;
   height: 100dvh;
+  height: 100svh;
   min-height: 0;
 }
 
@@ -97,7 +104,9 @@ svg {
   z-index: 30;
   display: flex;
   min-width: 0;
+  min-height: 0;
   flex-direction: column;
+  overflow: hidden;
   background: var(--sidebar);
   border-right: 1px solid var(--border);
   padding: 12px 10px;
@@ -106,6 +115,7 @@ svg {
 .sidebar-head {
   display: flex;
   height: 42px;
+  flex-shrink: 0;
   align-items: center;
   justify-content: space-between;
   padding: 0 6px;
@@ -195,10 +205,13 @@ svg {
 }
 
 .conversation-list {
+  flex: 1 1 auto;
   min-height: 0;
-  flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
   overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  padding-bottom: 8px;
 }
 
 .history-empty {
@@ -277,6 +290,7 @@ svg {
 
 .sidebar-foot {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   gap: 8px;
   margin: 10px 6px 0;
@@ -298,10 +312,12 @@ svg {
 /* Header */
 
 .main-panel {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   min-width: 0;
   min-height: 0;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  height: 100%;
+  overflow: hidden;
   background: var(--bg);
 }
 
@@ -451,6 +467,7 @@ svg {
 /* Conversation */
 
 .chat {
+  flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -1107,6 +1124,7 @@ svg {
 
 .composer-wrap {
   z-index: 10;
+  flex-shrink: 0;
   padding: 0 20px calc(10px + env(safe-area-inset-bottom));
   background: white;
 }
